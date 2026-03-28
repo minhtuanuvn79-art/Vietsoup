@@ -267,7 +267,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [products, setProducts] = useState(() => loadSavedData()?.products || []);
     const [history, setHistory] = useState(() => loadSavedData()?.history || []);
     const [orderCounter, setOrderCounter] = useState(() => loadSavedData()?.orderCounter || 1);
-    const [categories, setCategories] = useState(() => loadSavedData()?.categories || []);
+    
+    // Đã fix lỗi categories rỗng
+    const [categories, setCategories] = useState(() => loadSavedData()?.categories || ['Cà phê', 'Trà sữa', 'Đồ ăn', 'Khác']);
 
     // UI States
     const [cart, setCart] = useState([]);
@@ -327,7 +329,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     setProducts(cloudData.posData.products || []);
                     setHistory(cloudData.posData.history || []);
                     setOrderCounter(cloudData.posData.orderCounter || 1);
-                    setCategories(cloudData.posData.categories || []);
+                    setCategories(cloudData.posData.categories || ['Cà phê', 'Trà sữa', 'Đồ ăn', 'Khác']);
                 }
                 if (cloudData.users) {
                     setUsers(cloudData.users);
@@ -448,6 +450,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         if (newCatInput && !categories.includes(newCatInput)) {
             setCategories([...categories, newCatInput]);
             setNewCatInput('');
+            showNotification('Thêm danh mục thành công', 'success');
         }
     };
 
@@ -536,8 +539,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
         };
         if (editingIng) {
             setIngredients(ingredients.map(i => i.id === editingIng.id ? { ...i, ...ingData } : i));
+            showNotification("Đã cập nhật hàng hóa", "success");
         } else {
             setIngredients([...ingredients, { id: Date.now(), ...ingData }]);
+            showNotification("Đã thêm hàng mới", "success");
         }
         setShowIngModal(false);
     };
@@ -552,6 +557,29 @@ const AppPOS = ({ onNavigateAdmin }) => {
             newVariants[index] = { ...newVariants[index], [field]: value }; 
             return { ...prev, variants: newVariants }; 
         }); 
+    };
+
+    // Hàm thêm món mới
+    const handleAddProduct = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        
+        const validVariants = newProductForm.variants
+            .filter(v => v.price && !isNaN(parseInt(v.price)))
+            .map(v => ({...v, price: parseInt(v.price)}));
+
+        const newP = {
+            id: Date.now(),
+            name: fd.get('name'),
+            category: fd.get('category'),
+            image: fd.get('image') || '🍵',
+            variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', price: 0}]
+        };
+        
+        setProducts([...products, newP]);
+        setShowAddMenu(false);
+        setNewProductForm({ name: '', category: '', variants: [{ size: 'S', price: '' }, { size: 'M', price: '' }] });
+        showNotification("Đã thêm món mới thành công!", "success");
     };
 
     // --- RENDER LOGIN ---
@@ -689,7 +717,13 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'inventory' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="w-full mb-4 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng mới</button>
+                            <div className="flex gap-2 mb-4">
+                                <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng mới</button>
+                                <div className="flex flex-1 max-w-[200px]">
+                                    <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="w-full px-3 text-xs bg-slate-100 rounded-l-xl outline-none border-none font-bold" />
+                                    <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-r-xl"><Icon name="plus" size={16} /></button>
+                                </div>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {ingredients.map(ing => (
                                     <div key={ing.id} className="p-4 rounded-2xl bg-white border border-slate-200">
@@ -697,6 +731,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             <p className="font-black text-xs uppercase">{ing.name}</p>
                                             <p className={`font-black ${ing.stock < 5 ? 'text-red-600' : 'text-emerald-600'}`}>{ing.stock} {ing.unit}</p>
                                         </div>
+                                        <p className="text-[10px] font-bold text-slate-400 mb-2">Giá vốn: {ing.lastPrice?.toLocaleString()}đ</p>
                                         <div className="flex gap-2 mt-3">
                                             <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="flex-1 py-2 bg-slate-100 rounded-lg text-xs font-black">Sửa</button>
                                         </div>
@@ -711,11 +746,16 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             <button onClick={() => setShowAddMenu(true)} className="w-full mb-4 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm món mới</button>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {products.map(p => (
-                                    <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200">
-                                        <p className="font-black text-sm uppercase mb-2">{p.name}</p>
+                                    <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 relative">
+                                        <p className="font-black text-sm uppercase mb-2 pr-6">{p.name}</p>
+                                        <span className="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500 font-bold uppercase">{p.category}</span>
+                                        <div className="mt-3 space-y-1">
+                                            {p.variants?.map((v, i) => (
+                                                <p key={i} className="text-xs font-bold text-emerald-600">{v.size}: {v.price.toLocaleString()}đ</p>
+                                            ))}
+                                        </div>
                                         <div className="flex gap-2 border-t pt-2 mt-2">
-                                            <button onClick={() => setEditingRecipeProduct({...p})} className="flex-1 py-2 bg-slate-100 rounded-lg text-[10px] font-black uppercase">Công thức</button>
-                                            <button onClick={() => setProducts(products.filter(item => item.id !== p.id))} className="px-3 bg-red-50 text-red-500 rounded-lg"><Icon name="trash-2" size={14}/></button>
+                                            <button onClick={() => {if(confirm('Bạn muốn xoá món này?')) setProducts(products.filter(item => item.id !== p.id))}} className="w-full py-2 bg-red-50 text-red-500 rounded-lg text-[10px] font-black uppercase"><Icon name="trash-2" size={14} className="inline mr-1"/> Xóa món</button>
                                         </div>
                                     </div>
                                 ))}
@@ -809,6 +849,60 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
+            {/* MODAL KHO HÀNG */}
+            {showIngModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <form onSubmit={handleIngSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-black uppercase italic mb-6">{editingIng ? 'Sửa hàng' : 'Nhập hàng mới'}</h3>
+                        <div className="space-y-3">
+                            <input name="name" defaultValue={editingIng?.name} placeholder="Tên hàng hóa (vd: Cà phê hạt)" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input name="unit" defaultValue={editingIng?.unit} placeholder="Đơn vị (Kg, Lít)" className="p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                                <input name="stock" type="number" step="0.1" defaultValue={editingIng?.stock} placeholder="Số lượng" className="p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            </div>
+                            <input name="costPrice" type="number" defaultValue={editingIng?.lastPrice} placeholder="Giá vốn" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            <input name="sellPrice" type="number" defaultValue={editingIng?.sellPrice} placeholder="Giá bán lẻ (Để trống nếu ko bán)" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" />
+                            <select name="category" defaultValue={editingIng?.category || categories[0]} className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm">
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase shadow-xl text-xs">Lưu dữ liệu</button>
+                        <button type="button" onClick={() => setShowIngModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-2">Hủy bỏ</button>
+                    </form>
+                </div>
+            )}
+
+            {/* MODAL THÊM MÓN VÀO THỰC ĐƠN */}
+            {showAddMenu && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <form onSubmit={handleAddProduct} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Thêm món mới</h3>
+                        <div className="space-y-3">
+                            <input name="name" placeholder="Tên món (vd: Trà sữa trân châu)" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            <div className="flex gap-2">
+                                <select name="category" className="flex-1 p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm">
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <input name="image" placeholder="Icon (🍵)" defaultValue="🍵" className="w-20 p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-center text-xl" />
+                            </div>
+                            
+                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                <p className="text-[10px] font-black uppercase text-slate-400 mb-3">Biến thể (Size / Giá)</p>
+                                {newProductForm.variants.map((v, idx) => (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                        <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="Tên Size (S, M...)" className="w-1/3 p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" />
+                                        <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="Giá bán" className="flex-1 p-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase shadow-xl text-xs">Tạo món</button>
+                        <button type="button" onClick={() => setShowAddMenu(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-2">Hủy bỏ</button>
+                    </form>
+                </div>
+            )}
+
+            {/* THÔNG BÁO FLOAT */}
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-2 pointer-events-none w-[90%] md:w-auto">
                 {notifications.map((notif) => (
                     <div key={notif.id} className={`flex items-center justify-center gap-2 px-4 py-3 rounded-full shadow-2xl text-xs font-bold transition-all duration-300 ${notif.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
