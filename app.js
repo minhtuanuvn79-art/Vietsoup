@@ -1,7 +1,24 @@
-const { useState, useMemo, useEffect } = React;
+const { useState, useMemo, useEffect, useRef } = React;
         
-// --- CONSTANTS & CONFIG ---
-const API_URL = 'https://script.google.com/macros/s/AKfycbwhk9e4ANbbq9Pu0sJ3JYqGG3kkSBVzMz4zTgECsXGxEDIpGsTLGa4P3pcPs_dUHKi-0Q/exec';
+// ==========================================
+// CẤU HÌNH FIREBASE
+// ==========================================
+const firebaseConfig = {
+    apiKey: "AIzaSyB4X-zrIiXSB5kGPm0ohxZLpTq43BCIff8",
+    authDomain: "ocganit-38680.firebaseapp.com",
+    databaseURL: "https://ocganit-38680-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "ocganit-38680",
+    storageBucket: "ocganit-38680.firebasestorage.app",
+    messagingSenderId: "15640532202",
+    appId: "1:15640532202:web:d51e1378f2da5a2394b393",
+    measurementId: "G-ZWCM87VC4F"
+};
+
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+const db = firebase.database();
+
 const STORAGE_KEY = 'SMART_POS_DATA_V5';
 const USERS_KEY = 'SMART_POS_USERS';
 const CURRENT_USER_KEY = 'SMART_POS_CURRENT_USER';
@@ -39,47 +56,37 @@ const AppAdmin = ({ onNavigateBack }) => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [isSyncing, setIsSyncing] = useState(false);
+    
+    const isSyncingFromCloud = useRef(false);
 
-    const syncToCloud = async (currentUsers) => {
+    const syncToCloud = (currentUsers) => {
+        if (isSyncingFromCloud.current) return;
         setIsSyncing(true);
-        try {
-            const posData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-            await fetch(API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'syncAll',
-                    users: currentUsers,
-                    posData: posData,
-                    timestamp: new Date().toISOString()
-                })
-            });
-        } catch (e) {
-            console.error("Lỗi đồng bộ:", e);
-        } finally {
-            setTimeout(() => setIsSyncing(false), 1000);
-        }
+        const posData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        db.ref('/').update({
+            users: currentUsers,
+            posData: posData,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        }).finally(() => setTimeout(() => setIsSyncing(false), 500));
     };
-
-    const loadFromCloud = async () => {
-        try {
-            const response = await fetch(`${API_URL}?action=getData`);
-            const cloudData = await response.json();
-            if (cloudData && cloudData.users) {
-                setUsers(cloudData.users);
-                localStorage.setItem(USERS_KEY, JSON.stringify(cloudData.users));
-            }
-        } catch (e) {
-            console.error("Lỗi tải dữ liệu từ Cloud:", e);
-        }
-    };
-
-    useEffect(() => { loadFromCloud(); }, []);
 
     useEffect(() => {
-        localStorage.setItem(USERS_KEY, JSON.stringify(users));
-        if (users.length > 0) {
+        const usersRef = db.ref('users');
+        usersRef.on('value', (snapshot) => {
+            const cloudUsers = snapshot.val();
+            if (cloudUsers) {
+                isSyncingFromCloud.current = true;
+                setUsers(cloudUsers);
+                localStorage.setItem(USERS_KEY, JSON.stringify(cloudUsers));
+                setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
+            }
+        });
+        return () => usersRef.off();
+    }, []);
+
+    useEffect(() => {
+        if (!isSyncingFromCloud.current && users.length > 0) {
+            localStorage.setItem(USERS_KEY, JSON.stringify(users));
             syncToCloud(users);
         }
     }, [users]);
@@ -112,7 +119,6 @@ const AppAdmin = ({ onNavigateBack }) => {
 
     return (
         <div className="flex flex-col md:flex-row h-[100dvh] w-full bg-[#F8FAFC] overflow-hidden text-slate-900 font-sans">
-            {/* Sidebar Admin (Desktop) */}
             <aside className="hidden md:flex w-20 lg:w-64 bg-[#0F172A] text-white flex-col shrink-0">
                 <div className="p-6 border-b border-white/5 flex items-center gap-3">
                     <div className="bg-emerald-500 p-2 rounded-xl"><Icon name="shield-check" fill="white" /></div>
@@ -123,21 +129,17 @@ const AppAdmin = ({ onNavigateBack }) => {
                     <SidebarItem icon="arrow-left" label="Quay lại POS" onClick={onNavigateBack} />
                 </nav>
                 <div className="p-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                    {isSyncing ? 'Sync...' : 'Online'}
+                    {isSyncing ? 'Syncing...' : 'Realtime Active'}
                 </div>
             </aside>
 
-            {/* Main Content Admin */}
             <main className="flex-1 p-4 md:p-10 overflow-y-auto pb-24 md:pb-10">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                     <div>
                         <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase italic leading-tight">Tài khoản</h1>
                         <p className="text-slate-400 font-medium text-sm">Quản lý nhân viên</p>
                     </div>
-                    <button 
-                        onClick={() => setShowAddModal(true)}
-                        className="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-2xl md:rounded-3xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all"
-                    >
+                    <button onClick={() => setShowAddModal(true)} className="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-2xl md:rounded-3xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all">
                         <Icon name="user-plus" /> Thêm nhân viên
                     </button>
                 </div>
@@ -173,7 +175,6 @@ const AppAdmin = ({ onNavigateBack }) => {
                 </div>
             </main>
 
-            {/* Bottom Nav Admin cho Mobile */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2">
                 <button className="text-emerald-400 flex flex-col items-center gap-1 w-full h-full justify-center">
                     <Icon name="users" size={20} />
@@ -185,7 +186,6 @@ const AppAdmin = ({ onNavigateBack }) => {
                 </button>
             </nav>
 
-            {/* Modals Admin */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <form onSubmit={addUser} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -241,7 +241,7 @@ const AppAdmin = ({ onNavigateBack }) => {
                                             }}
                                             className="w-4 h-4 accent-emerald-600"
                                         />
-                                        <span className="capitalize">{perm === 'pos' ? 'POS' : perm === 'preparing' ? 'Hàng đợi' : perm === 'inventory' ? 'Kho' : perm === 'menu' ? 'Menu' : 'Báo cáo'}</span>
+                                        <span className="capitalize">{perm}</span>
                                     </label>
                                 ))}
                             </div>
@@ -260,7 +260,7 @@ const AppAdmin = ({ onNavigateBack }) => {
 // ==========================================
 const AppPOS = ({ onNavigateAdmin }) => {
     const [activeTab, setActiveTab] = useState('pos');
-    const [showMobileCart, setShowMobileCart] = useState(false); // State quản lý giỏ hàng mobile
+    const [showMobileCart, setShowMobileCart] = useState(false);
     
     // Core States
     const [ingredients, setIngredients] = useState(() => loadSavedData()?.ingredients || []);
@@ -303,27 +303,25 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [loginUsername, setLoginUsername] = useState('');
     const [loginPassword, setLoginPassword] = useState('');
 
-    const syncToCloud = async (data, usersData) => {
-        try {
-            await fetch(API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'syncAll',
-                    posData: data,
-                    users: usersData,
-                    timestamp: new Date().toISOString()
-                })
-            });
-        } catch (e) { console.error("Cloud Sync Error", e); }
+    const isSyncingFromCloud = useRef(false);
+
+    const syncToCloud = (data, usersData) => {
+        if (isSyncingFromCloud.current) return;
+        db.ref('/').update({
+            posData: data,
+            users: usersData,
+            timestamp: firebase.database.ServerValue.TIMESTAMP
+        }).catch(e => console.error("Firebase Sync Error", e));
     };
 
-    const loadFromCloud = async () => {
-        try {
-            const response = await fetch(`${API_URL}?action=getData`);
-            const cloudData = await response.json();
+    // Firebase Lắng nghe Realtime
+    useEffect(() => {
+        const rootRef = db.ref('/');
+        rootRef.on('value', (snapshot) => {
+            const cloudData = snapshot.val();
             if (cloudData) {
+                isSyncingFromCloud.current = true;
+                
                 if (cloudData.posData) {
                     setIngredients(cloudData.posData.ingredients || []);
                     setProducts(cloudData.posData.products || []);
@@ -331,21 +329,26 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     setOrderCounter(cloudData.posData.orderCounter || 1);
                     setCategories(cloudData.posData.categories || []);
                 }
-                if (cloudData.users) setUsers(cloudData.users);
+                if (cloudData.users) {
+                    setUsers(cloudData.users);
+                    localStorage.setItem(USERS_KEY, JSON.stringify(cloudData.users));
+                }
+                
+                setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
             }
-        } catch (e) { console.error("Cloud Load Error", e); }
-    };
+        });
 
-    useEffect(() => { loadFromCloud(); }, []);
+        return () => rootRef.off();
+    }, []);
 
+    // Khởi tạo Admin mặc định nếu chưa có
     useEffect(() => {
-        if (users.length === 0) {
+        if (!isSyncingFromCloud.current && users.length === 0) {
             const defaultAdmin = {
                 id: 1, username: 'admin', name: 'Quản trị viên', role: 'admin',
-                permissions: ['pos','preparing','inventory','menu','history'], password: 'vietsoup@123'
+                permissions: ['pos','preparing','inventory','menu','history'], password: 'admin'
             };
             setUsers([defaultAdmin]);
-            localStorage.setItem(USERS_KEY, JSON.stringify([defaultAdmin]));
         }
     }, [users]);
 
@@ -354,6 +357,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     }, [currentUser]);
 
     useEffect(() => {
+        if (isSyncingFromCloud.current) return; 
+        
         const data = { ingredients, products, history, orderCounter, categories };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         syncToCloud(data, users);
@@ -476,7 +481,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setCart([]);
         setCustomerName('');
         setOrderCounter(prev => (prev >= 99 ? 1 : prev + 1));
-        setShowMobileCart(false); // Đóng giỏ hàng mobile sau khi đặt
+        setShowMobileCart(false);
         showNotification('Đơn hàng đã chuyển vào Hàng Đợi.', 'success');
     };
 
@@ -572,8 +577,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     // --- RENDER MAIN POS ---
     return (
         <div className="flex h-[100dvh] w-full bg-[#F8FAFC] overflow-hidden flex-col md:flex-row text-slate-900 font-sans">
-            
-            {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-24 lg:w-64 bg-[#0F172A] text-white flex-col shrink-0">
                 <div className="p-6 border-b border-white/5 flex items-center gap-3">
                     <div className="bg-emerald-500 p-2 rounded-xl"><Icon name="zap" fill="white" /></div>
@@ -592,16 +595,12 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             </aside>
 
-            {/* Main Content Area */}
             <main className="flex-1 flex flex-col overflow-hidden relative pb-[72px] md:pb-0">
-                
-                {/* Mobile Header */}
                 <header className="md:hidden h-14 bg-white border-b flex items-center justify-between px-4 shrink-0">
                     <div className="font-black text-emerald-600 text-sm">Xin chào, {currentUser.name}</div>
                     <button onClick={handleLogout} className="text-slate-400"><Icon name="log-out" size={20}/></button>
                 </header>
 
-                {/* Desktop Header */}
                 <header className="hidden md:flex h-16 bg-white border-b items-center justify-between px-6 shrink-0 z-10">
                     <div className="font-black text-emerald-600">Xin chào, {currentUser.name}</div>
                     {activeTab === 'pos' && (
@@ -613,12 +612,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </header>
 
                 <div className="flex-1 flex overflow-hidden">
-                    
-                    {/* --- TAB: POS --- */}
                     {activeTab === 'pos' && (
                         <>
                             <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 pb-24 md:pb-6">
-                                {/* Mobile Search */}
                                 <div className="md:hidden mb-4 relative">
                                     <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input type="text" placeholder="Tìm món..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
@@ -643,13 +639,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
                             
-                            {/* Nút Cart Nổi Cho Mobile */}
                             <button onClick={() => setShowMobileCart(true)} className="md:hidden fixed bottom-24 right-4 bg-emerald-600 text-white w-14 h-14 rounded-full shadow-2xl z-[45] flex items-center justify-center relative">
                                 <Icon name="shopping-cart" size={24} />
                                 {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.length}</span>}
                             </button>
 
-                            {/* Cart Sidebar Desktop */}
                             <div className="hidden md:flex w-80 lg:w-96 bg-white border-l border-slate-200 flex-col">
                                 <div className="p-4 border-b font-black text-[10px] uppercase text-slate-400 bg-slate-50">Đơn hàng #{orderCounter}</div>
                                 <div className="p-4 border-b"><input type="text" placeholder="Tên khách hàng..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-2 bg-slate-100 rounded-xl text-sm font-bold border-none" /></div>
@@ -676,7 +670,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         </>
                     )}
 
-                    {/* --- TABS KHÁC (Mobile giữ padding bottom) --- */}
                     {activeTab === 'preparing' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
                             {orders.map(order => (
@@ -694,7 +687,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         </div>
                     )}
 
-                    {/* Inventory & Menu giữ nguyên cấu trúc grid, tự động responsive với tailwind */}
                     {activeTab === 'inventory' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
                             <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="w-full mb-4 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng mới</button>
@@ -746,11 +738,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             ))}
                         </div>
                     )}
-
                 </div>
             </main>
 
-            {/* Bottom Navigation (Chỉ Mobile) */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2 shadow-[0_-10px_20px_rgba(0,0,0,0.1)]">
                 <button onClick={() => setActiveTab('pos')} className={`flex flex-col items-center gap-1 w-full h-full justify-center ${activeTab === 'pos' ? "text-emerald-400" : "text-slate-500"}`}>
                     <Icon name="layout-grid" size={20} />
@@ -781,7 +771,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 )}
             </nav>
 
-            {/* Modal Giỏ hàng Mobile (Full screen) */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 bg-white z-[100] flex flex-col slide-up-anim">
                     <div className="p-4 bg-[#0F172A] text-white flex justify-between items-center shrink-0 pt-safe">
@@ -790,7 +779,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     </div>
                     
                     <div className="p-4 border-b bg-slate-50 shrink-0">
-                        <input type="text" placeholder="Tên khách hàng (Không bắt buộc)..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
+                        <input type="text" placeholder="Tên khách (Không bắt buộc)..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -820,7 +809,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* Thông báo nổi */}
             <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[999] flex flex-col gap-2 pointer-events-none w-[90%] md:w-auto">
                 {notifications.map((notif) => (
                     <div key={notif.id} className={`flex items-center justify-center gap-2 px-4 py-3 rounded-full shadow-2xl text-xs font-bold transition-all duration-300 ${notif.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
@@ -829,9 +817,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     </div>
                 ))}
             </div>
-            
-            {/* Các Modals (Desktop giữ nguyên logic, Mobile tự full width theo tailwind) */}
-            {/* (Đã rút gọn bớt mã UI Modals thừa của Menu/Kho để đảm bảo độ mượt, nếu bạn cần nguyên xi có thể giữ lại đoạn cũ) */}
         </div>
     );
 };

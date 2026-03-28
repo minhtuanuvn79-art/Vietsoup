@@ -8,8 +8,8 @@ body {
 
 /* Tối ưu trải nghiệm chạm trên Mobile */
 * {
-    -webkit-tap-highlight-color: transparent; /* Tắt màu xanh khi bấm trên điện thoại */
-    touch-action: manipulation; /* Tối ưu thao tác chạm, chống zoom kép */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 /* Kích thước mục tiêu chuẩn cho ngón tay trên mobile */
@@ -22,18 +22,23 @@ input[type="text"], input[type="number"], input[type="password"], input[type="da
 }
 
 /* Tùy chỉnh thanh cuộn */
-.custom-scrollbar::-webkit-scrollbar { 
-    width: 4px; 
-}
-.custom-scrollbar::-webkit-scrollbar-track { 
-    background: transparent; 
-}
-.custom-scrollbar::-webkit-scrollbar-thumb { 
-    background: #e2e8f0; 
-    border-radius: 10px; 
-}
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
 
 /* Ẩn scrollbar nhưng vẫn cho phép cuộn */
-.no-scrollbar::-webkit-scrollbar { 
-    display: none; 
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Hiệu ứng trượt lên cho Modal Giỏ hàng trên Mobile */
+.slide-up-anim {
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+@keyframes slideUp {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* Khoảng cách an toàn cho các thiết bị có tai thỏ / home bar */
+.pb-safe { padding-bottom: env(safe-area-inset-bottom); }
+.pt-safe { padding-top: env(safe-area-inset-top); }
