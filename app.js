@@ -58,7 +58,7 @@ const AppAdmin = ({ onNavigateBack }) => {
     const [isSyncing, setIsSyncing] = useState(false);
     
     const isSyncingFromCloud = useRef(false);
-    const isInitialLoad = useRef(true); // FIX: Biến cờ chặn ghi đè dữ liệu lần đầu
+    const isInitialLoad = useRef(true);
 
     const syncToCloud = (currentUsers) => {
         if (isSyncingFromCloud.current) return;
@@ -81,13 +81,12 @@ const AppAdmin = ({ onNavigateBack }) => {
                 localStorage.setItem(USERS_KEY, JSON.stringify(cloudUsers));
                 setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
             }
-            isInitialLoad.current = false; // FIX: Đánh dấu đã tải xong từ cloud
+            isInitialLoad.current = false;
         });
         return () => usersRef.off();
     }, []);
 
     useEffect(() => {
-        // FIX: Chặn ghi đè nếu đang tải lần đầu
         if (!isSyncingFromCloud.current && !isInitialLoad.current && users.length > 0) {
             localStorage.setItem(USERS_KEY, JSON.stringify(users));
             syncToCloud(users);
@@ -306,7 +305,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [loginPassword, setLoginPassword] = useState('');
 
     const isSyncingFromCloud = useRef(false);
-    const isInitialLoad = useRef(true); // FIX: Cờ đánh dấu lúc khởi tạo
+    const isInitialLoad = useRef(true);
 
     const syncToCloud = (data, usersData) => {
         if (isSyncingFromCloud.current) return;
@@ -339,7 +338,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 
                 setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
             }
-            isInitialLoad.current = false; // FIX: Firebase trả dữ liệu về rồi, gỡ cờ chặn!
+            isInitialLoad.current = false;
         });
 
         return () => rootRef.off();
@@ -361,7 +360,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     }, [currentUser]);
 
     useEffect(() => {
-        // FIX: Nếu là lần render đầu tiên (hoặc đang nhận từ cloud) -> Không đẩy dữ liệu lên Firebase!
         if (isSyncingFromCloud.current || isInitialLoad.current) return; 
         
         const data = { ingredients, products, history, orderCounter, categories };
@@ -783,30 +781,36 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             </main>
 
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2 shadow-[0_-10px_20px_rgba(0,0,0,0.1)]">
-                <button onClick={() => setActiveTab('pos')} className={`flex flex-col items-center gap-1 w-full h-full justify-center ${activeTab === 'pos' ? "text-emerald-400" : "text-slate-500"}`}>
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex items-center h-[72px] border-t border-white/5 z-40 pb-2 shadow-[0_-10px_20px_rgba(0,0,0,0.1)] overflow-x-auto no-scrollbar px-4 gap-6 justify-start">
+                <button onClick={() => setActiveTab('pos')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'pos' ? "text-emerald-400" : "text-slate-500"}`}>
                     <Icon name="layout-grid" size={20} />
                     <span className="text-[9px] font-black uppercase mt-1">Bán hàng</span>
                 </button>
-                <button onClick={() => setActiveTab('preparing')} className={`flex flex-col items-center gap-1 w-full h-full justify-center relative ${activeTab === 'preparing' ? "text-emerald-400" : "text-slate-500"}`}>
+                <button onClick={() => setActiveTab('preparing')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center relative ${activeTab === 'preparing' ? "text-emerald-400" : "text-slate-500"}`}>
                     <Icon name="clipboard-list" size={20} />
-                    {stats.waiting > 0 && <span className="absolute top-1 right-4 bg-orange-500 w-3 h-3 rounded-full"></span>}
+                    {stats.waiting > 0 && <span className="absolute top-1 right-0 bg-orange-500 w-3 h-3 rounded-full"></span>}
                     <span className="text-[9px] font-black uppercase mt-1">Đợi ({stats.waiting})</span>
                 </button>
                 {currentUser.permissions?.includes('inventory') && (
-                    <button onClick={() => setActiveTab('inventory')} className={`flex flex-col items-center gap-1 w-full h-full justify-center ${activeTab === 'inventory' ? "text-emerald-400" : "text-slate-500"}`}>
+                    <button onClick={() => setActiveTab('inventory')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'inventory' ? "text-emerald-400" : "text-slate-500"}`}>
                         <Icon name="database" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Kho</span>
                     </button>
                 )}
+                {currentUser.permissions?.includes('menu') && (
+                    <button onClick={() => setActiveTab('menu')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'menu' ? "text-emerald-400" : "text-slate-500"}`}>
+                        <Icon name="settings" size={20} />
+                        <span className="text-[9px] font-black uppercase mt-1">Thực đơn</span>
+                    </button>
+                )}
                 {currentUser.permissions?.includes('history') && (
-                    <button onClick={() => setActiveTab('history')} className={`flex flex-col items-center gap-1 w-full h-full justify-center ${activeTab === 'history' ? "text-emerald-400" : "text-slate-500"}`}>
+                    <button onClick={() => setActiveTab('history')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'history' ? "text-emerald-400" : "text-slate-500"}`}>
                         <Icon name="history" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Báo cáo</span>
                     </button>
                 )}
                 {currentUser.role === 'admin' && (
-                    <button onClick={onNavigateAdmin} className="flex flex-col items-center gap-1 w-full h-full justify-center text-slate-500">
+                    <button onClick={onNavigateAdmin} className="shrink-0 flex flex-col items-center gap-1 h-full justify-center text-slate-500">
                         <Icon name="users" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Admin</span>
                     </button>
