@@ -420,6 +420,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const yesterdayStart = todayStart - 86400000;
         const lastWeekStart = todayStart - 7 * 86400000;
+        const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate()).getTime();
         const lastYearStart = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
 
         return history.filter(h => {
@@ -428,6 +429,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
             if (reportFilter === 'today') matchesTime = hTime >= todayStart;
             if (reportFilter === 'yesterday') matchesTime = hTime >= yesterdayStart && hTime < todayStart;
             if (reportFilter === 'week') matchesTime = hTime >= lastWeekStart;
+            if (reportFilter === 'month') matchesTime = hTime >= lastMonthStart;
             if (reportFilter === 'year') matchesTime = hTime >= lastYearStart;
             if (reportFilter === 'custom') {
                 const start = new Date(startDate).setHours(0,0,0,0);
@@ -629,6 +631,14 @@ const AppPOS = ({ onNavigateAdmin }) => {
         showNotification("Đã thêm món mới thành công!", "success");
     };
 
+    // Lấy danh sách toàn bộ nhân viên (bao gồm đã xóa nhưng còn trong lịch sử)
+    const allSellers = useMemo(() => {
+        return Array.from(new Set([
+            ...users.map(u => u.name), 
+            ...history.map(h => h.seller).filter(Boolean)
+        ]));
+    }, [users, history]);
+
     // --- RENDER LOGIN ---
     if (!currentUser) {
         return (
@@ -813,17 +823,82 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'history' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            <div className="bg-emerald-500 text-white p-4 rounded-2xl mb-4">
-                                <p className="text-xs font-black uppercase mb-1">Doanh thu</p>
-                                <h2 className="text-2xl font-black">{reportStats.total.toLocaleString()}đ</h2>
-                            </div>
-                            {filteredHistory.map((h) => (
-                                <div key={h.id} className="bg-white p-4 rounded-2xl border border-slate-200 mb-3 text-sm">
-                                    <div className="flex justify-between font-black uppercase mb-2"><span>{h.customer}</span><span className="text-emerald-600">{h.total.toLocaleString()}đ</span></div>
-                                    <p className="text-xs text-slate-500 mb-2">{h.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
-                                    <p className="text-[10px] font-bold text-slate-400">{new Date(h.timestamp).toLocaleString('vi-VN')} - NV: {h.seller}</p>
+                            {/* KHU VỰC BỘ LỌC */}
+                            <div className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Thời gian</label>
+                                        <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700">
+                                            <option value="today">Hôm nay</option>
+                                            <option value="yesterday">Hôm qua</option>
+                                            <option value="week">1 tuần qua</option>
+                                            <option value="month">1 tháng qua</option>
+                                            <option value="year">1 năm qua</option>
+                                            <option value="custom">Tùy chỉnh khoảng thời gian...</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Nhân viên bán</label>
+                                        <select value={selectedSeller} onChange={(e) => setSelectedSeller(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700">
+                                            <option value="Tất cả">Tất cả nhân viên</option>
+                                            {allSellers.map(name => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
-                            ))}
+                                
+                                {/* Tùy chọn Ngày cụ thể */}
+                                {reportFilter === 'custom' && (
+                                    <div className="flex gap-3 mt-3 pt-3 border-t border-slate-100">
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Từ ngày</label>
+                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Đến ngày</label>
+                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* BẢNG THỐNG KÊ TỔNG */}
+                            <div className="bg-emerald-500 text-white p-5 rounded-2xl mb-4 shadow-md">
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase opacity-80 mb-1">Tổng doanh thu</p>
+                                        <h2 className="text-3xl font-black">{reportStats.total.toLocaleString()}đ</h2>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-[10px] font-black uppercase opacity-80 mb-1">Số đơn hàng</p>
+                                        <h2 className="text-2xl font-black">{reportStats.count}</h2>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* DANH SÁCH LỊCH SỬ ĐƠN */}
+                            <div className="space-y-3">
+                                {filteredHistory.length === 0 ? (
+                                    <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-sm">
+                                        Chưa có dữ liệu nào trong khoảng thời gian này!
+                                    </div>
+                                ) : (
+                                    filteredHistory.map((h) => (
+                                        <div key={h.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-sm">
+                                            <div className="flex justify-between font-black uppercase mb-3 border-b border-slate-50 pb-2">
+                                                <span className="text-slate-700">{h.customer} <span className="text-slate-400 text-[10px] font-bold ml-1">#{h.token}</span></span>
+                                                <span className="text-emerald-600">{h.total.toLocaleString()}đ</span>
+                                            </div>
+                                            <p className="text-xs text-slate-600 mb-3 bg-slate-50 p-2 rounded-lg font-medium">{h.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
+                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                                <span>{new Date(h.timestamp).toLocaleString('vi-VN')}</span>
+                                                <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="inline mr-1" />{h.seller}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
@@ -956,7 +1031,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL QUẢN LÝ DANH MỤC (MỚI THÊM) */}
+            {/* MODAL QUẢN LÝ DANH MỤC */}
             {showCatModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
