@@ -309,8 +309,12 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
     const [editingHistoryItem, setEditingHistoryItem] = useState(null);
+    const [showHistoryEditModal, setShowHistoryEditModal] = useState(false);
     const [showCatModal, setShowCatModal] = useState(false);
     const [editingCat, setEditingCat] = useState({ old: '', new: '' });
+    
+    const [editingStockTrans, setEditingStockTrans] = useState(null);
+    const [showStockTransEditModal, setShowStockTransEditModal] = useState(false);
 
     // User States
     const [users, setUsers] = useState(() => {
@@ -336,6 +340,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }).catch(e => console.error("Firebase Sync Error", e));
     };
 
+    // Firebase Lắng nghe Realtime
     useEffect(() => {
         const rootRef = db.ref('/');
         rootRef.on('value', (snapshot) => {
@@ -364,6 +369,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         return () => rootRef.off();
     }, []);
 
+    // Khởi tạo Admin mặc định nếu chưa có
     useEffect(() => {
         if (!isSyncingFromCloud.current && users.length === 0) {
             const defaultAdmin = {
@@ -582,7 +588,43 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setOrders(prev => prev.filter(o => o.id !== orderId));
     };
 
-    // Hàm xóa hàng hóa trong kho
+    // --- SỬA VÀ XÓA HÓA ĐƠN BÁN HÀNG ---
+    const handleDeleteHistoryItem = (id) => {
+        if (!confirm('Bạn có chắc muốn xóa hóa đơn này? Số lượng hàng hóa đã bán sẽ được hoàn lại vào kho.')) return;
+        const itemToDelete = history.find(h => h.id === id);
+        if (!itemToDelete) return;
+
+        // Hoàn lại kho
+        let updatedIngredients = [...ingredients];
+        itemToDelete.items.forEach(item => {
+            if (item.type === 'retail') {
+                const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
+                if (idx !== -1) updatedIngredients[idx].stock += item.quantity;
+            } else if (item.recipe) {
+                item.recipe.forEach(r => {
+                    const idx = updatedIngredients.findIndex(ing => ing.id === r.ingId);
+                    if (idx !== -1) updatedIngredients[idx].stock += (r.amount * item.quantity);
+                });
+            }
+        });
+        
+        setIngredients(updatedIngredients);
+        setHistory(prev => prev.filter(h => h.id !== id));
+        showNotification('Đã xóa hóa đơn và hoàn lại kho', 'success');
+    };
+
+    const saveHistoryEdit = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const newTotal = parseFloat(fd.get('total')) || 0;
+        const newCustomer = fd.get('customer');
+        
+        setHistory(prev => prev.map(h => h.id === editingHistoryItem.id ? {...h, customer: newCustomer, total: newTotal} : h));
+        setShowHistoryEditModal(false);
+        setEditingHistoryItem(null);
+        showNotification('Cập nhật hóa đơn thành công', 'success');
+    };
+
     const handleDeleteIngredient = (id) => {
         if (confirm('Bạn có chắc chắn muốn xoá mặt hàng này khỏi hệ thống?')) {
             setIngredients(prev => prev.filter(i => i.id !== id));
@@ -609,7 +651,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setShowIngModal(false);
     };
 
-    // State mới: Chỉ hiện 1 ô biến thể mặc định lúc mở modal Thêm món
     const [newProductForm, setNewProductForm] = useState({
         name: '', category: '', variants: [{ size: 'Mặc định', price: '' }]
     });
@@ -706,7 +747,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
             id: `IMP${Date.now()}`,
             type: 'import',
             timestamp: new Date().toISOString(),
-            items: processedImport.map(i => ({ name: i.name, qty: i.finalQty, price: i.finalPrice })),
+            items: processedImport.map(i => ({ id: i.id, name: i.name, qty: i.finalQty, price: i.finalPrice })),
             total: totalCost,
             seller: currentUser.name
         };
@@ -751,7 +792,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 id: `STK${Date.now()}`,
                 type: 'stocktake',
                 timestamp: new Date().toISOString(),
-                items: changedItems.map(i => ({ name: i.name, oldStock: i.stock, newStock: i.finalActual, diff: parseFloat((i.finalActual - i.stock).toFixed(2)) })),
+                items: changedItems.map(i => ({ id: i.id, name: i.name, oldStock: i.stock, newStock: i.finalActual, diff: parseFloat((i.finalActual - i.stock).toFixed(2)) })),
                 total: 0,
                 seller: currentUser.name
             };
@@ -761,6 +802,40 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setStocktakeList([]);
         setInventoryTab('stock');
         showNotification('Cân bằng kho thành công!', 'success');
+    };
+
+    // --- SỬA VÀ XÓA LỊCH SỬ KHO ---
+    const handleDeleteStockTrans = (id) => {
+        if (!confirm('Xóa phiếu này sẽ tự động hoàn tác lại số lượng tồn kho. Bạn có chắc chắn?')) return;
+        const trans = stockTransactions.find(t => t.id === id);
+        if (!trans) return;
+
+        let updatedIngredients = [...ingredients];
+        trans.items.forEach(item => {
+            const idx = updatedIngredients.findIndex(ing => ing.id === item.id || ing.name === item.name);
+            if (idx !== -1) {
+                if (trans.type === 'import') {
+                    updatedIngredients[idx].stock -= item.qty;
+                } else if (trans.type === 'stocktake') {
+                    updatedIngredients[idx].stock -= item.diff; // diff = new - old
+                }
+            }
+        });
+        
+        setIngredients(updatedIngredients);
+        setStockTransactions(prev => prev.filter(t => t.id !== id));
+        showNotification('Đã xóa phiếu và hoàn tác kho', 'success');
+    };
+
+    const saveStockTransEdit = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const newTotal = parseFloat(fd.get('total')) || 0;
+        
+        setStockTransactions(prev => prev.map(t => t.id === editingStockTrans.id ? {...t, total: newTotal} : t));
+        setShowStockTransEditModal(false);
+        setEditingStockTrans(null);
+        showNotification('Cập nhật phiếu thành công', 'success');
     };
 
     // --- RENDER LOGIN ---
@@ -943,7 +1018,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                                 <p className="text-[10px] font-bold text-slate-400 mb-2">Giá vốn: {ing.lastPrice?.toLocaleString()}đ</p>
                                                 <div className="flex gap-2 mt-3 border-t border-slate-50 pt-3">
-                                                    <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1"/>Sửa</button>
+                                                    <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
                                                     <button onClick={() => handleDeleteIngredient(ing.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={16}/></button>
                                                 </div>
                                             </div>
@@ -1111,9 +1186,15 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                         </div>
                                                     ))}
                                                 </div>
-                                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-b border-slate-50 pb-3 mb-3">
                                                     <span>{new Date(trans.timestamp).toLocaleString('vi-VN')}</span>
-                                                    <span className="uppercase"><Icon name="user" size={10} className="mr-1" />{trans.seller}</span>
+                                                    <span className="uppercase"><Icon name="user" size={10} className="mr-1 inline" />{trans.seller}</span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {trans.type === 'import' && (
+                                                        <button onClick={() => { setEditingStockTrans(trans); setShowStockTransEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa tổng tiền</button>
+                                                    )}
+                                                    <button onClick={() => handleDeleteStockTrans(trans.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa phiếu</button>
                                                 </div>
                                             </div>
                                         ))
@@ -1218,9 +1299,13 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 <span className="text-emerald-600">{h.total.toLocaleString()}đ</span>
                                             </div>
                                             <p className="text-xs text-slate-600 mb-3 bg-slate-50 p-2 rounded-lg font-medium">{h.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
-                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
+                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-b border-slate-50 pb-3 mb-3">
                                                 <span>{new Date(h.timestamp).toLocaleString('vi-VN')}</span>
-                                                <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="mr-1" />{h.seller}</span>
+                                                <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="mr-1 inline" />{h.seller}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setEditingHistoryItem(h); setShowHistoryEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa thông tin</button>
+                                                <button onClick={() => handleDeleteHistoryItem(h.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa hóa đơn</button>
                                             </div>
                                         </div>
                                     ))
@@ -1408,6 +1493,53 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         </div>
                         <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Tạo món ngay</button>
                         <button type="button" onClick={() => setShowAddMenu(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
+                    </form>
+                </div>
+            )}
+
+            {/* MODAL SỬA LỊCH SỬ BÁN HÀNG */}
+            {showHistoryEditModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <form onSubmit={saveHistoryEdit} className="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Sửa Hóa Đơn</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên Khách Hàng</label>
+                                <input name="customer" defaultValue={editingHistoryItem?.customer} placeholder="Tên khách" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tổng Số Tiền</label>
+                                <div className="relative">
+                                    <input name="total" type="number" defaultValue={editingHistoryItem?.total} placeholder="0" className="w-full p-4 pr-10 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                                </div>
+                            </div>
+                            <div className="bg-orange-50 p-3 rounded-xl">
+                                <p className="text-[10px] font-bold text-orange-600 leading-relaxed"><Icon name="alert-circle" size={12} className="inline mr-1" />Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng XÓA hóa đơn (để hệ thống hoàn lại kho) và tạo đơn mới.</p>
+                            </div>
+                        </div>
+                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Cập nhật hóa đơn</button>
+                        <button type="button" onClick={() => setShowHistoryEditModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
+                    </form>
+                </div>
+            )}
+
+            {/* MODAL SỬA PHIẾU KHO */}
+            {showStockTransEditModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <form onSubmit={saveStockTransEdit} className="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Sửa Phiếu Kho</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tổng Số Tiền Nhập</label>
+                                <div className="relative">
+                                    <input name="total" type="number" defaultValue={editingStockTrans?.total} placeholder="0" className="w-full p-4 pr-10 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu thay đổi</button>
+                        <button type="button" onClick={() => setShowStockTransEditModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
                     </form>
                 </div>
             )}
