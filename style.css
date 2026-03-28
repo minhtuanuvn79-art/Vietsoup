@@ -1,0 +1,22 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+body { 
+    font-family: 'Inter', sans-serif; 
+}
+
+/* Tùy chỉnh thanh cuộn */
+.custom-scrollbar::-webkit-scrollbar { 
+    width: 4px; 
+}
+.custom-scrollbar::-webkit-scrollbar-track { 
+    background: transparent; 
+}
+.custom-scrollbar::-webkit-scrollbar-thumb { 
+    background: #e2e8f0; 
+    border-radius: 10px; 
+}
+
+/* Ẩn scrollbar nhưng vẫn cho phép cuộn */
+.no-scrollbar::-webkit-scrollbar { 
+    display: none; 
+}

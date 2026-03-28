@@ -1,0 +1,1075 @@
+const { useState, useMemo, useEffect } = React;
+        
+// --- CONSTANTS & CONFIG ---
+const API_URL = 'https://script.google.com/macros/s/AKfycbwhk9e4ANbbq9Pu0sJ3JYqGG3kkSBVzMz4zTgECsXGxEDIpGsTLGa4P3pcPs_dUHKi-0Q/exec';
+const STORAGE_KEY = 'SMART_POS_DATA_V5';
+const USERS_KEY = 'SMART_POS_USERS';
+const CURRENT_USER_KEY = 'SMART_POS_CURRENT_USER';
+
+// --- SHARED COMPONENTS ---
+const Icon = ({ name, size = 16, ...props }) => {
+    useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+    }, [name]);
+    return <i data-lucide={name} style={{ width: size, height: size }} {...props}></i>;
+};
+
+const SidebarItem = ({ icon, label, active, onClick, badge }) => (
+    <button onClick={onClick} className={`w-full flex items-center gap-4 px-4 py-4 rounded-2xl transition-all group ${active ? 'bg-emerald-500 text-white shadow-lg' : 'text-slate-500 hover:bg-white/5'}`}>
+        <Icon name={icon} />
+        <span className="font-black text-[10px] hidden lg:block uppercase tracking-widest flex-1 text-left">{label}</span>
+        {badge && <span className={`hidden lg:flex w-6 h-6 items-center justify-center rounded-lg text-[10px] font-black ${active ? 'bg-white text-emerald-600' : 'bg-orange-500 text-white'}`}>{badge}</span>}
+    </button>
+);
+
+const loadSavedData = () => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+};
+
+// ==========================================
+// COMPONENT: ADMIN PANEL
+// ==========================================
+const AppAdmin = ({ onNavigateBack }) => {
+    const [users, setUsers] = useState(() => {
+        const saved = localStorage.getItem(USERS_KEY);
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [editingUser, setEditingUser] = useState(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const syncToCloud = async (currentUsers) => {
+        setIsSyncing(true);
+        try {
+            const posData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'syncAll',
+                    users: currentUsers,
+                    posData: posData,
+                    timestamp: new Date().toISOString()
+                })
+            });
+        } catch (e) {
+            console.error("Lỗi đồng bộ:", e);
+        } finally {
+            setTimeout(() => setIsSyncing(false), 1000);
+        }
+    };
+
+    const loadFromCloud = async () => {
+        try {
+            const response = await fetch(`${API_URL}?action=getData`);
+            const cloudData = await response.json();
+            if (cloudData && cloudData.users) {
+                setUsers(cloudData.users);
+                localStorage.setItem(USERS_KEY, JSON.stringify(cloudData.users));
+            }
+        } catch (e) {
+            console.error("Lỗi tải dữ liệu từ Cloud:", e);
+        }
+    };
+
+    useEffect(() => { loadFromCloud(); }, []);
+
+    useEffect(() => {
+        localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        if (users.length > 0) {
+            syncToCloud(users);
+        }
+    }, [users]);
+
+    const addUser = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const newUser = {
+            id: Date.now(),
+            name: fd.get('name'),
+            username: fd.get('username'),
+            password: fd.get('password'),
+            role: fd.get('role'),
+            permissions: fd.getAll('perms')
+        };
+        setUsers([...users, newUser]);
+        setShowAddModal(false);
+    };
+
+    const deleteUser = (id) => {
+        if (confirm('Xác nhận xóa tài khoản này?')) {
+            setUsers(users.filter(u => u.id !== id));
+        }
+    };
+
+    const saveEditedUser = () => {
+        setUsers(users.map(u => u.id === editingUser.id ? editingUser : u));
+        setEditingUser(null);
+    };
+
+    return (
+        <div className="flex flex-col md:flex-row h-screen w-full bg-[#F8FAFC] overflow-hidden text-slate-900 font-sans">
+            {/* Sidebar Admin */}
+            <aside className="hidden md:flex w-20 lg:w-64 bg-[#0F172A] text-white flex-col shrink-0">
+                <div className="p-6 border-b border-white/5 flex items-center gap-3">
+                    <div className="bg-emerald-500 p-2 rounded-xl"><Icon name="shield-check" fill="white" /></div>
+                    <span className="font-black text-lg tracking-tighter uppercase italic text-emerald-400 hidden lg:block">Admin Panel</span>
+                </div>
+                <nav className="flex-1 p-4 space-y-2">
+                    <SidebarItem icon="users" label="Nhân viên" active={true} />
+                    <SidebarItem icon="arrow-left" label="Quay lại POS" onClick={onNavigateBack} />
+                </nav>
+                <div className="p-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                    {isSyncing ? 'Sync...' : 'Online'}
+                </div>
+            </aside>
+
+            {/* Main Content Admin */}
+            <main className="flex-1 p-4 md:p-10 overflow-y-auto pb-24 md:pb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-black text-slate-800 uppercase italic leading-tight">Tài khoản hệ thống</h1>
+                        <p className="text-slate-400 font-medium text-sm">Quản lý quyền truy cập nhân viên</p>
+                    </div>
+                    <button 
+                        onClick={() => setShowAddModal(true)}
+                        className="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-2xl md:rounded-3xl font-black text-xs uppercase shadow-xl flex items-center justify-center gap-3 hover:bg-emerald-600 transition-all"
+                    >
+                        <Icon name="user-plus" /> Thêm tài khoản
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                    {users.map(user => (
+                        <div key={user.id} className="bg-white p-6 md:p-8 rounded-[2rem] md:rounded-[3rem] border border-slate-100 shadow-sm group hover:shadow-xl transition-all relative">
+                            <div className="flex justify-between items-start mb-6">
+                                <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl flex items-center justify-center text-xl md:text-2xl ${user.role === 'admin' ? 'bg-rose-50 text-rose-500' : 'bg-emerald-50 text-emerald-500'}`}>
+                                    <Icon name={user.role === 'admin' ? "shield" : "user"} size={24} />
+                                </div>
+                                <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={() => setEditingUser({...user})} className="p-2 md:p-3 bg-slate-50 rounded-xl text-slate-400 hover:text-blue-500"><Icon name="edit-3" /></button>
+                                    <button onClick={() => deleteUser(user.id)} className="p-2 md:p-3 bg-red-50 rounded-xl text-red-300 hover:text-red-500"><Icon name="trash-2" /></button>
+                                </div>
+                            </div>
+                            <h3 className="font-black text-slate-800 text-lg md:text-xl mb-1 truncate">{user.name}</h3>
+                            <p className="text-slate-400 font-bold text-[10px] md:text-xs uppercase mb-4 tracking-wider">@{user.username}</p>
+                            <div className="flex flex-wrap gap-2 mb-6 min-h-[50px] items-start">
+                                <span className={`px-2 py-1 rounded-lg text-[8px] md:text-[9px] font-black uppercase ${user.role === 'admin' ? 'bg-rose-100 text-rose-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                    {user.role}
+                                </span>
+                                {user.permissions?.map(p => (
+                                    <span key={p} className="px-2 py-1 bg-slate-100 text-slate-500 rounded-lg text-[8px] md:text-[9px] font-black uppercase">{p}</span>
+                                ))}
+                            </div>
+                            <div className="pt-4 md:pt-6 border-t border-slate-50 flex items-center justify-between">
+                                <span className="text-[9px] md:text-[10px] font-black text-slate-300 uppercase italic">Pass: {user.password}</span>
+                                <Icon name="lock" size={14} className="text-slate-200" />
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </main>
+
+            {/* Bottom Nav Admin cho Mobile */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-16 border-t border-white/5 z-40 px-6">
+                <button className="text-emerald-400 flex flex-col items-center gap-1">
+                    <Icon name="users" size={20} />
+                    <span className="text-[8px] font-black uppercase">Nhân viên</span>
+                </button>
+                <button onClick={onNavigateBack} className="text-slate-500 flex flex-col items-center gap-1">
+                    <Icon name="arrow-left" size={20} />
+                    <span className="text-[8px] font-black uppercase">Rời Admin</span>
+                </button>
+            </nav>
+
+            {/* Modals Admin */}
+            {showAddModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <form onSubmit={addUser} className="bg-white rounded-[2rem] md:rounded-[3rem] w-full max-w-md p-6 md:p-10 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl md:text-2xl font-black uppercase italic mb-6 md:mb-8">Tạo tài khoản mới</h3>
+                        <div className="space-y-3 md:space-y-4">
+                            <input name="name" placeholder="Tên hiển thị" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            <input name="username" placeholder="Tên đăng nhập" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            <input name="password" placeholder="Mật khẩu" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm" required />
+                            <select name="role" className="w-full p-4 bg-slate-100 rounded-2xl font-bold border-none outline-none text-sm">
+                                <option value="staff">Nhân viên (Staff)</option>
+                                <option value="admin">Quản trị viên (Admin)</option>
+                            </select>
+                            <div className="py-2">
+                                <p className="text-[10px] font-black uppercase text-slate-400 mb-3 ml-2">Quyền truy cập</p>
+                                <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-slate-600">
+                                    {['pos', 'preparing', 'inventory', 'menu', 'history'].map(perm => (
+                                        <label key={perm} className="flex items-center gap-2 cursor-pointer bg-slate-50 p-3 rounded-xl">
+                                            <input type="checkbox" name="perms" value={perm} defaultChecked className="w-4 h-4 accent-emerald-500" />
+                                            <span className="capitalize">{perm}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" className="w-full mt-6 py-4 md:py-5 bg-slate-900 text-white rounded-2xl md:rounded-3xl font-black uppercase shadow-xl hover:bg-emerald-600 transition-all text-xs">Tạo nhân viên</button>
+                        <button type="button" onClick={() => setShowAddModal(false)} className="w-full mt-4 text-slate-400 font-bold text-[10px] uppercase">Hủy bỏ</button>
+                    </form>
+                </div>
+            )}
+
+            {editingUser && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2rem] md:rounded-[3rem] w-full max-w-md p-6 md:p-10 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl md:text-2xl font-black uppercase italic mb-6 md:mb-8">Sửa tài khoản</h3>
+                        <div className="space-y-3 md:space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Tên hiển thị</label>
+                                <input value={editingUser.name} onChange={e => setEditingUser({...editingUser, name: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold text-sm" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Mật khẩu</label>
+                                <input value={editingUser.password} onChange={e => setEditingUser({...editingUser, password: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold text-sm" />
+                            </div>
+                            <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value})} className="w-full p-4 bg-slate-100 rounded-2xl font-bold text-sm">
+                                <option value="staff">Staff</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                            <div className="grid grid-cols-2 gap-2 text-[11px] font-bold py-2">
+                                {['pos', 'preparing', 'inventory', 'menu', 'history'].map(perm => (
+                                    <label key={perm} className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={editingUser.permissions?.includes(perm)}
+                                            onChange={e => {
+                                                const newPerms = e.target.checked 
+                                                    ? [...(editingUser.permissions || []), perm]
+                                                    : (editingUser.permissions || []).filter(p => p !== perm);
+                                                setEditingUser({...editingUser, permissions: newPerms});
+                                            }}
+                                            className="w-4 h-4 accent-emerald-600"
+                                        />
+                                        <span className="capitalize">{perm === 'pos' ? 'Bán hàng' : perm === 'preparing' ? 'Hàng đợi' : perm === 'inventory' ? 'Kho' : perm === 'menu' ? 'Thực đơn' : 'Báo cáo'}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <button onClick={saveEditedUser} className="w-full mt-4 py-4 md:py-5 bg-emerald-600 text-white rounded-2xl md:rounded-3xl font-black text-xs uppercase shadow-lg">Lưu thay đổi</button>
+                        <button onClick={() => setEditingUser(null)} className="w-full mt-3 py-2 text-slate-400 font-bold text-[10px] uppercase">Đóng</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ==========================================
+// COMPONENT: POS SYSTEM
+// ==========================================
+const AppPOS = ({ onNavigateAdmin }) => {
+    const [activeTab, setActiveTab] = useState('pos');
+    
+    // Core States
+    const [ingredients, setIngredients] = useState(() => loadSavedData()?.ingredients || []);
+    const [products, setProducts] = useState(() => loadSavedData()?.products || []);
+    const [history, setHistory] = useState(() => loadSavedData()?.history || []);
+    const [orderCounter, setOrderCounter] = useState(() => loadSavedData()?.orderCounter || 1);
+    const [categories, setCategories] = useState(() => loadSavedData()?.categories || []);
+
+    // UI States
+    const [cart, setCart] = useState([]);
+    const [orders, setOrders] = useState([]);
+    const [customerName, setCustomerName] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState('Tất cả');
+    const [newCatInput, setNewCatInput] = useState('');
+    const [notifications, setNotifications] = useState([]);
+    
+    // Report Filter States
+    const [reportFilter, setReportFilter] = useState('today');
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [selectedSeller, setSelectedSeller] = useState('Tất cả');
+    
+    // Modal States
+    const [showAddMenu, setShowAddMenu] = useState(false);
+    const [showIngModal, setShowIngModal] = useState(false);
+    const [editingIng, setEditingIng] = useState(null);
+    const [editingRecipeProduct, setEditingRecipeProduct] = useState(null);
+    const [editingHistoryItem, setEditingHistoryItem] = useState(null);
+
+    // User States
+    const [users, setUsers] = useState(() => {
+        const saved = localStorage.getItem(USERS_KEY);
+        return saved ? JSON.parse(saved) : [];
+    });
+    const [currentUser, setCurrentUser] = useState(() => {
+        const saved = localStorage.getItem(CURRENT_USER_KEY);
+        return saved ? JSON.parse(saved) : null;
+    });
+    const [loginUsername, setLoginUsername] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+
+    const syncToCloud = async (data, usersData) => {
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'syncAll',
+                    posData: data,
+                    users: usersData,
+                    timestamp: new Date().toISOString()
+                })
+            });
+        } catch (e) { console.error("Cloud Sync Error", e); }
+    };
+
+    const loadFromCloud = async () => {
+        try {
+            const response = await fetch(`${API_URL}?action=getData`);
+            const cloudData = await response.json();
+            if (cloudData) {
+                if (cloudData.posData) {
+                    setIngredients(cloudData.posData.ingredients || []);
+                    setProducts(cloudData.posData.products || []);
+                    setHistory(cloudData.posData.history || []);
+                    setOrderCounter(cloudData.posData.orderCounter || 1);
+                    setCategories(cloudData.posData.categories || []);
+                }
+                if (cloudData.users) setUsers(cloudData.users);
+                showNotification("Đã đồng bộ dữ liệu mới nhất từ Cloud", "success");
+            }
+        } catch (e) { console.error("Cloud Load Error", e); }
+    };
+
+    useEffect(() => { loadFromCloud(); }, []);
+
+    useEffect(() => {
+        if (users.length === 0) {
+            const defaultAdmin = {
+                id: 1,
+                username: 'admin',
+                name: 'Quản trị viên',
+                role: 'admin',
+                permissions: ['pos','preparing','inventory','menu','history'],
+                password: 'vietsoup@123'
+            };
+            setUsers([defaultAdmin]);
+            localStorage.setItem(USERS_KEY, JSON.stringify([defaultAdmin]));
+        }
+    }, [users]);
+
+    useEffect(() => {
+        if (currentUser) {
+            localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(currentUser));
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        const data = { ingredients, products, history, orderCounter, categories };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        syncToCloud(data, users);
+    }, [ingredients, products, history, orderCounter, categories, users]);
+
+    const showNotification = (message, type = 'success') => {
+        const id = Date.now();
+        setNotifications(prev => [...prev, { id, message, type }]);
+        setTimeout(() => {
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        }, 4000);
+    };
+
+    const handleLogin = (e) => {
+        e.preventDefault();
+        const found = users.find(u => u.username === loginUsername && u.password === loginPassword);
+        if (found) {
+            setCurrentUser(found);
+            setLoginUsername('');
+            setLoginPassword('');
+            showNotification(`✅ Chào mừng ${found.name}!`, 'success');
+        } else {
+            alert('❌ Tên đăng nhập hoặc mật khẩu không đúng!');
+        }
+    };
+
+    const handleLogout = () => {
+        setCurrentUser(null);
+        localStorage.removeItem(CURRENT_USER_KEY);
+        showNotification('Đã đăng xuất', 'success');
+    };
+
+    const posItems = useMemo(() => {
+        const processedProducts = products.flatMap(p => {
+            if (p.variants && p.variants.length > 0) {
+                return p.variants.map(v => ({
+                    ...p,
+                    id: `${p.id}-${v.size}`,
+                    variantId: v.size,
+                    name: `${p.name} (${v.size})`,
+                    price: v.price,
+                    type: 'menu'
+                }));
+            }
+            return [{ ...p, type: 'menu' }];
+        });
+
+        const retailItems = ingredients
+            .filter(i => i.sellPrice > 0)
+            .map(i => ({ 
+                id: `retail-${i.id}`, 
+                originalId: i.id,
+                name: i.name, 
+                price: i.sellPrice, 
+                category: i.category || 'Chưa phân loại', 
+                image: '📦', 
+                type: 'retail' 
+            }));
+        
+        return [...processedProducts, ...retailItems].filter(item => {
+            const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesCat = selectedCategory === 'Tất cả' || item.category === selectedCategory;
+            return matchesSearch && matchesCat;
+        });
+    }, [products, ingredients, searchTerm, selectedCategory]);
+
+    const filteredHistory = useMemo(() => {
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const yesterdayStart = todayStart - 86400000;
+        const lastWeekStart = todayStart - 7 * 86400000;
+        const lastYearStart = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate()).getTime();
+
+        return history.filter(h => {
+            const hTime = new Date(h.timestamp).getTime();
+            let matchesTime = true;
+            if (reportFilter === 'today') matchesTime = hTime >= todayStart;
+            if (reportFilter === 'yesterday') matchesTime = hTime >= yesterdayStart && hTime < todayStart;
+            if (reportFilter === 'week') matchesTime = hTime >= lastWeekStart;
+            if (reportFilter === 'year') matchesTime = hTime >= lastYearStart;
+            if (reportFilter === 'custom') {
+                const start = new Date(startDate).setHours(0,0,0,0);
+                const end = new Date(endDate).setHours(23,59,59,999);
+                matchesTime = hTime >= start && hTime <= end;
+            }
+            const matchesSeller = selectedSeller === 'Tất cả' || (h.seller || 'Không rõ') === selectedSeller;
+            return matchesTime && matchesSeller;
+        });
+    }, [history, reportFilter, startDate, endDate, selectedSeller]);
+
+    const reportStats = useMemo(() => {
+        const total = filteredHistory.reduce((sum, h) => sum + h.total, 0);
+        return { total, count: filteredHistory.length };
+    }, [filteredHistory]);
+
+    const stats = useMemo(() => ({
+        waiting: orders.length,
+        lowStock: ingredients.filter(i => i.stock < 5).length
+    }), [orders, ingredients]);
+
+    const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+    const addCategory = () => {
+        if (newCatInput && !categories.includes(newCatInput)) {
+            setCategories([...categories, newCatInput]);
+            setNewCatInput('');
+        }
+    };
+
+    const addToCart = (item) => {
+        setCart(prev => {
+            const existing = prev.find(i => i.id === item.id);
+            if (existing) return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+            return [...prev, { ...item, quantity: 1 }];
+        });
+    };
+
+    const updateQuantity = (id, delta) => {
+        setCart(prev => prev.map(item => 
+            item.id === id ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item
+        ).filter(item => item.quantity > 0));
+    };
+
+    const handleInstantOrder = () => {
+        if (cart.length === 0) return;
+        const newOrder = {
+            id: `ORD${Date.now().toString().slice(-4)}`,
+            token: orderCounter,
+            customer: customerName || 'Khách lẻ',
+            timestamp: new Date().toISOString(),
+            items: [...cart],
+            total: subtotal,
+            seller: currentUser.name
+        };
+        setOrders([...orders, newOrder]);
+        setCart([]);
+        setCustomerName('');
+        setOrderCounter(prev => (prev >= 99 ? 1 : prev + 1));
+        showNotification('✅ Đơn hàng đã được xác nhận! Chuyển sang phần Hàng Đợi.', 'success');
+    };
+
+    const handlePayment = (orderId) => {
+        const orderToPay = orders.find(o => o.id === orderId);
+        if (!orderToPay) return;
+        const updatedIngredients = [...ingredients];
+        orderToPay.items.forEach(item => {
+            if (item.type === 'retail') {
+                const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
+                if (idx !== -1) updatedIngredients[idx].stock -= item.quantity;
+            } else if (item.recipe) {
+                item.recipe.forEach(r => {
+                    const idx = updatedIngredients.findIndex(ing => ing.id === r.ingId);
+                    if (idx !== -1) updatedIngredients[idx].stock -= (r.amount * item.quantity);
+                });
+            }
+        });
+        setIngredients(updatedIngredients);
+        const finalizedOrder = { 
+            ...orderToPay, 
+            timestamp: new Date().toISOString(),
+            payTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            seller: currentUser.name
+        };
+        setHistory([finalizedOrder, ...history]);
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+        showNotification(`✅ Hoàn tất đơn hàng #${orderToPay.token}! Doanh thu đã cập nhật.`, 'success');
+    };
+
+    const handleDeleteWaitingOrder = (orderId) => {
+        if (!confirm('Xác nhận xóa đơn hàng đợi này?')) return;
+        setOrders(prev => prev.filter(o => o.id !== orderId));
+        showNotification('Đã xóa đơn hàng đợi', 'success');
+    };
+
+    const handleUpdateHistory = () => {
+        if (!editingHistoryItem) return;
+        const newTotal = editingHistoryItem.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const updated = history.map(h => 
+            h.id === editingHistoryItem.id 
+                ? { ...editingHistoryItem, total: newTotal }
+                : h
+        );
+        setHistory(updated);
+        setEditingHistoryItem(null);
+        showNotification('Đã cập nhật đơn hàng trong lịch sử', 'success');
+    };
+
+    const handleIngSubmit = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const ingData = {
+            name: fd.get('name'),
+            unit: fd.get('unit'),
+            lastPrice: parseInt(fd.get('costPrice')) || 0,
+            sellPrice: parseInt(fd.get('sellPrice')) || 0,
+            category: fd.get('category'),
+            stock: parseFloat(fd.get('stock')) || 0
+        };
+        if (editingIng) {
+            setIngredients(ingredients.map(i => i.id === editingIng.id ? { ...i, ...ingData } : i));
+        } else {
+            setIngredients([...ingredients, { id: Date.now(), ...ingData }]);
+        }
+        setShowIngModal(false);
+    };
+
+    const [newProductForm, setNewProductForm] = useState({
+        name: '', category: '', variants: [{ size: 'S', price: '' }, { size: 'M', price: '' }, { size: 'L', price: '' }]
+    });
+
+    const addVariant = () => { setNewProductForm(prev => ({ ...prev, variants: [...prev.variants, { size: '', price: '' }] })); };
+    const updateVariant = (index, field, value) => { setNewProductForm(prev => { const newVariants = [...prev.variants]; newVariants[index] = { ...newVariants[index], [field]: value }; return { ...prev, variants: newVariants }; }); };
+    const removeVariant = (index) => { setNewProductForm(prev => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) })); };
+
+    if (!currentUser) {
+        return (
+            <div className="flex h-screen bg-[#F8FAFC] items-center justify-center font-sans">
+                <div className="bg-white rounded-[3rem] p-12 w-full max-w-md shadow-2xl">
+                    <div className="flex justify-center mb-8">
+                        <div className="bg-emerald-500 p-4 rounded-2xl"><Icon name="zap" size={48} fill="white" /></div>
+                    </div>
+                    <h1 className="text-3xl font-black uppercase italic text-center tracking-tighter mb-2">SMART POS</h1>
+                    <p className="text-center text-slate-500 mb-10">Đăng nhập để tiếp tục</p>
+
+                    <form onSubmit={handleLogin} className="space-y-6">
+                        <div>
+                            <label className="text-xs font-black uppercase text-slate-400 block mb-2">Tên đăng nhập</label>
+                            <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)} className="w-full p-5 bg-slate-100 rounded-2xl text-lg font-bold outline-none focus:ring-2 ring-emerald-500" placeholder="admin" required />
+                        </div>
+                        <div>
+                            <label className="text-xs font-black uppercase text-slate-400 block mb-2">Mật khẩu</label>
+                            <input type="password" value={loginPassword} onChange={(e) => setLoginPassword(e.target.value)} className="w-full p-5 bg-slate-100 rounded-2xl text-lg font-bold outline-none focus:ring-2 ring-emerald-500" placeholder="••••••••" required />
+                        </div>
+                        <button type="submit" className="w-full py-6 bg-emerald-600 text-white rounded-2xl font-black text-sm uppercase shadow-xl active:scale-95 transition-all">Đăng nhập vào hệ thống</button>
+                    </form>
+                    <p className="text-center text-[10px] text-slate-400 mt-8">Mặc định: admin / vietsoup@123</p>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden flex-col md:flex-row text-slate-900 font-sans">
+            <aside className="hidden md:flex w-20 lg:w-64 bg-[#0F172A] text-white flex-col shrink-0">
+                <div className="p-6 border-b border-white/5 flex items-center gap-3">
+                    <div className="bg-emerald-500 p-2 rounded-xl shadow-lg"><Icon name="zap" fill="white" /></div>
+                    <span className="font-black text-lg hidden lg:block tracking-tighter uppercase italic text-emerald-400">Smart POS</span>
+                </div>
+                <nav className="flex-1 p-4 space-y-2">
+                    <SidebarItem icon="layout-grid" label="Bán Hàng" active={activeTab === 'pos'} onClick={() => setActiveTab('pos')} />
+                    <SidebarItem icon="clipboard-list" label="Hàng Đợi" active={activeTab === 'preparing'} onClick={() => setActiveTab('preparing')} badge={stats.waiting} />
+                    <SidebarItem icon="database" label="Kho & Hàng" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} badge={stats.lowStock > 0 ? '!' : null} />
+                    <SidebarItem icon="settings" label="Thực Đơn" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />
+                    <SidebarItem icon="history" label="Báo Cáo" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />
+                    <SidebarItem 
+                        icon="users" 
+                        label="Quản Trị" 
+                        active={false} 
+                        onClick={() => {
+                            if (currentUser.role === 'admin') {
+                                onNavigateAdmin();
+                            } else {
+                                alert('Bạn không có quyền truy cập Quản Trị!');
+                            }
+                        }} 
+                    />
+                </nav>
+                <div className="p-4 border-t border-white/10">
+                    <div className="mb-3 px-4 py-3 bg-white/10 rounded-2xl text-white text-xs">
+                        <div className="font-black mb-1">{currentUser.name}</div>
+                        <div className="opacity-80">@{currentUser.username}</div>
+                        <div className={`mt-1 font-bold uppercase tracking-wider text-[10px] ${currentUser.role === 'admin' ? 'text-rose-300' : 'text-emerald-300'}`}>
+                            {currentUser.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}
+                        </div>
+                    </div>
+                    <button onClick={handleLogout} className="w-full flex items-center justify-center gap-3 bg-white/10 hover:bg-white/20 py-4 rounded-2xl text-white font-black text-xs uppercase transition-all">
+                        <Icon name="log-out" size={16} /> Đăng xuất
+                    </button>
+                </div>
+            </aside>
+
+            <main className="flex-1 flex flex-col overflow-hidden">
+                <header className="h-16 bg-white border-b flex items-center justify-between px-6 shrink-0 z-10">
+                    <div className="flex items-center gap-3">
+                        <span className="font-black text-emerald-600">Xin chào, {currentUser.name}</span>
+                    </div>
+                    <div className="flex-1 max-w-xl">
+                        {activeTab === 'pos' && (
+                            <div className="relative">
+                                <Icon name="search" size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input type="text" placeholder="Tìm tên món hoặc hàng hóa..." className="w-full pl-12 pr-4 py-2.5 bg-slate-100 rounded-2xl text-xs font-bold border-none focus:ring-2 ring-emerald-500/20" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-3 ml-4">
+                        <div className="bg-orange-50 text-orange-700 px-4 py-1.5 rounded-lg border border-orange-100 font-black text-[10px] uppercase flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
+                            {stats.waiting} Đang chờ
+                        </div>
+                    </div>
+                </header>
+
+                <div className="flex-1 flex overflow-hidden">
+                    {/* POS VIEW */}
+                    {activeTab === 'pos' && (
+                        <>
+                            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
+                                <div className="flex gap-2 overflow-x-auto pb-4 no-scrollbar">
+                                    <button onClick={() => setSelectedCategory('Tất cả')} className={`px-5 py-2 rounded-xl font-black text-[10px] uppercase whitespace-nowrap transition-all ${selectedCategory === 'Tất cả' ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-100'}`}>Tất cả</button>
+                                    {categories.map(cat => (
+                                        <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-5 py-2 rounded-xl font-black text-[10px] uppercase whitespace-nowrap transition-all ${selectedCategory === cat ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-400 border border-slate-100'}`}>{cat}</button>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 mt-2">
+                                    {posItems.length === 0 ? (
+                                        <div className="col-span-full py-20 text-center opacity-30 font-black uppercase italic tracking-widest">{categories.length === 0 ? "Hãy thêm nhóm hàng và sản phẩm" : "Không tìm thấy sản phẩm"}</div>
+                                    ) : (
+                                        posItems.map(item => (
+                                            <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 hover:border-emerald-500 transition-all text-left flex flex-col active:scale-95 group relative overflow-hidden">
+                                                {item.type === 'retail' && <span className="absolute top-3 right-3 bg-blue-500 text-white text-[8px] font-black px-2 py-1 rounded-lg uppercase">Bán lẻ</span>}
+                                                <div className="aspect-square mb-4 bg-slate-50 rounded-2xl flex items-center justify-center text-4xl group-hover:scale-110 transition-transform">{item.image || '🍵'}</div>
+                                                <span className="font-black text-slate-800 text-[10px] mb-1 uppercase truncate">{item.name}</span>
+                                                <span className="text-emerald-600 font-black text-sm">{item.price.toLocaleString()}đ</span>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="w-80 lg:w-96 bg-white border-l border-slate-200 flex flex-col hidden md:flex">
+                                <div className="p-4 border-b font-black text-[10px] uppercase tracking-widest text-slate-400 bg-slate-50">Đơn hàng #{orderCounter}</div>
+                                <div className="p-4"><input type="text" placeholder="Tên khách hàng..." className="w-full px-4 py-3 bg-slate-100 rounded-2xl text-xs font-bold border-none outline-none" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /></div>
+                                <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+                                    {cart.map(item => (
+                                        <div key={item.id} className="flex gap-3 items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                                            <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-xl italic font-black text-slate-300">{item.image || '🍵'}</div>
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-[10px] font-black truncate uppercase">{item.name}</h4>
+                                                <p className="text-[10px] text-emerald-600 font-bold">{item.price.toLocaleString()}đ</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button onClick={() => updateQuantity(item.id, -1)} className="p-1 rounded-lg bg-slate-100"><Icon name="minus" size={12}/></button>
+                                                <span className="w-5 text-center text-xs font-black">{item.quantity}</span>
+                                                <button onClick={() => updateQuantity(item.id, 1)} className="p-1 rounded-lg bg-slate-100"><Icon name="plus" size={12}/></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="p-8 bg-slate-900 text-white rounded-t-[3rem] shadow-inner">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <span className="text-slate-400 text-[10px] font-black uppercase">Thanh toán</span>
+                                        <span className="text-2xl font-black text-emerald-400">{subtotal.toLocaleString()}đ</span>
+                                    </div>
+                                    <button onClick={handleInstantOrder} disabled={cart.length === 0} className="w-full py-5 bg-emerald-500 rounded-[2rem] font-black text-sm uppercase shadow-xl active:scale-95 flex items-center justify-center gap-3"><Icon name="check-circle" size={18} /> Xác nhận đơn</button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+
+                    {/* INVENTORY VIEW */}
+                    {activeTab === 'inventory' && (
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-slate-800">Kho hàng & Hàng hóa</h3>
+                                <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-[10px] uppercase shadow-lg">Thêm hàng mới</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {ingredients.map(ing => (
+                                    <div key={ing.id} className="p-6 rounded-[2rem] bg-white shadow-sm border border-slate-100 flex flex-col group relative transition-all hover:shadow-md">
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div>
+                                                <p className="font-black text-slate-800 uppercase text-xs">{ing.name}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">{ing.category || 'Chưa phân nhóm'}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className={`text-xl font-black ${ing.stock < 5 ? 'text-red-600' : 'text-emerald-600'}`}>{ing.stock} <span className="text-[10px] font-bold uppercase text-slate-400">{ing.unit}</span></p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 border-t pt-4 border-slate-50">
+                                            <div>
+                                                <p className="text-[8px] font-black text-slate-400 uppercase italic">Giá vốn</p>
+                                                <p className="text-[11px] font-black text-slate-700">{ing.lastPrice?.toLocaleString()}đ</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[8px] font-black text-slate-400 uppercase italic">Giá bán</p>
+                                                <p className={`text-[11px] font-black ${ing.sellPrice > 0 ? 'text-blue-600' : 'text-slate-300 italic'}`}>{ing.sellPrice > 0 ? ing.sellPrice.toLocaleString() + 'đ' : 'Không bán'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="mt-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="px-3 py-2 bg-slate-100 rounded-lg text-slate-600 text-[10px] font-black uppercase">Sửa</button>
+                                            <button onClick={() => { if(confirm(`Xóa ${ing.name}?`)) setIngredients(ingredients.filter(i => i.id !== ing.id)); }} className="px-3 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] font-black uppercase">Xóa</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* MENU VIEW */}
+                    {activeTab === 'menu' && (
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50">
+                            <div className="flex justify-between items-center mb-8">
+                                <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-800">Thực đơn</h3>
+                                <button onClick={() => setShowAddMenu(true)} className="bg-emerald-500 text-white px-6 py-3 rounded-xl font-black text-xs uppercase shadow-lg">Thêm món mới</button>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {products.map(p => (
+                                    <div key={p.id} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col group">
+                                        <div className="flex items-center gap-4 mb-4">
+                                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center text-3xl italic">☕</div>
+                                            <div className="flex-1">
+                                                <p className="font-black text-slate-800 text-xs uppercase">{p.name}</p>
+                                                <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">{p.category || 'Chưa phân nhóm'}</p>
+                                                {p.variants && p.variants.length > 0 ? (
+                                                    <div className="text-[10px] text-slate-600">{p.variants.map(v => `${v.size}: ${v.price.toLocaleString()}đ`).join(' | ')}</div>
+                                                ) : (
+                                                    <p className="text-emerald-600 font-black text-sm">{p.price?.toLocaleString()}đ</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="border-t border-dashed border-slate-100 pt-4 flex gap-2">
+                                            <button onClick={() => setEditingRecipeProduct({...p})} className="flex-1 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-600 py-3 rounded-xl font-black text-[10px] uppercase transition-colors">Định mức thành phần</button>
+                                            <button onClick={() => setProducts(products.filter(item => item.id !== p.id))} className="w-12 bg-red-50 text-red-400 flex items-center justify-center rounded-xl"><Icon name="trash-2" size={16}/></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* HISTORY & REPORT VIEW */}
+                    {activeTab === 'history' && (
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8">
+                                <div>
+                                    <h3 className="text-2xl font-black uppercase italic tracking-tighter text-slate-800">Báo cáo doanh thu</h3>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{reportFilter === 'custom' ? `Từ ${startDate} đến ${endDate}` : `Lọc theo: ${reportFilter}`}</p>
+                                </div>
+                                <div className="flex flex-wrap gap-2 items-center">
+                                    {[{id: 'today', label: 'Hôm nay'}, {id: 'yesterday', label: 'Hôm qua'}, {id: 'week', label: '7 ngày'}, {id: 'year', label: '1 năm'}, {id: 'all', label: 'Tất cả'}, {id: 'custom', label: 'Tùy chọn'}].map(btn => (
+                                        <button key={btn.id} onClick={() => setReportFilter(btn.id)} className={`px-4 py-2 rounded-xl font-black text-[10px] uppercase transition-all ${reportFilter === btn.id ? 'bg-slate-900 text-white shadow-lg' : 'bg-white text-slate-400 border border-slate-100'}`}>{btn.label}</button>
+                                    ))}
+                                    <select value={selectedSeller} onChange={(e) => setSelectedSeller(e.target.value)} className="px-4 py-2 rounded-xl font-black text-[10px] uppercase bg-white border border-slate-100 focus:outline-none focus:ring-2 ring-emerald-500">
+                                        <option value="Tất cả">Tất cả nhân viên</option>
+                                        {users.map(user => <option key={user.id} value={user.name}>{user.name} ({user.role === 'admin' ? 'Quản trị' : 'Nhân viên'})</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {reportFilter === 'custom' && (
+                                <div className="mb-8 p-6 bg-white rounded-[2rem] border border-slate-100 flex flex-wrap items-end gap-4 shadow-sm">
+                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Từ ngày</label><input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="block w-48 p-3 bg-slate-100 rounded-xl font-bold border-none outline-none text-xs" /></div>
+                                    <div className="space-y-2"><label className="text-[10px] font-black uppercase text-slate-400 ml-2">Đến ngày</label><input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="block w-48 p-3 bg-slate-100 rounded-xl font-bold border-none outline-none text-xs" /></div>
+                                    <div className="h-10 flex items-center px-4 bg-emerald-50 text-emerald-600 rounded-xl"><Icon name="calendar" size={14} className="mr-2"/><span className="text-[10px] font-black uppercase">Đang áp dụng</span></div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                                <div className="bg-emerald-500 text-white p-6 rounded-[2rem] shadow-emerald-200 shadow-xl"><p className="text-[10px] font-black uppercase tracking-widest opacity-80 mb-2">Tổng doanh thu</p><h2 className="text-3xl font-black italic">{reportStats.total.toLocaleString()}đ</h2></div>
+                                <div className="bg-white border border-slate-100 p-6 rounded-[2rem] shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Số lượng đơn</p><h2 className="text-3xl font-black text-slate-800 italic">{reportStats.count} đơn</h2></div>
+                            </div>
+
+                            <div className="space-y-4">
+                                {filteredHistory.length === 0 ? (
+                                    <div className="text-center py-20 opacity-20 font-black uppercase italic text-xl">Không có dữ liệu cho nhân viên "{selectedSeller}" trong khoảng thời gian này</div>
+                                ) : (
+                                    filteredHistory.map((h) => (
+                                        <div key={h.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4 group">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-slate-50 w-12 h-12 rounded-2xl flex items-center justify-center font-black text-slate-400 text-xs">#{h.token}</div>
+                                                <div>
+                                                    <div className="flex items-center gap-2"><h4 className="font-black text-slate-800 uppercase text-xs">{h.customer}</h4><span className="text-[8px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded font-bold uppercase">{new Date(h.timestamp).toLocaleDateString('vi-VN')}</span></div>
+                                                    <p className="text-[10px] text-slate-600 font-bold uppercase">Bán bởi: <span className="text-emerald-600">{h.seller || 'Không rõ'}</span></p>
+                                                    <p className="text-[10px] text-slate-400 font-bold uppercase">{h.payTime || '00:00'}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 flex flex-wrap gap-2">{h.items.map((it, idx) => <span key={idx} className="text-[9px] font-black bg-slate-50 text-slate-500 border border-slate-100 px-3 py-1 rounded-lg uppercase">{it.name} x{it.quantity}</span>)}</div>
+                                            <div className="flex items-center gap-6">
+                                                <div className="text-right"><p className="text-emerald-600 font-black text-lg">{h.total.toLocaleString()}đ</p></div>
+                                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    <button onClick={() => setEditingHistoryItem({...h, items: [...h.items]})} className="p-2 bg-slate-100 rounded-xl text-slate-400 hover:text-blue-500 transition-colors"><Icon name="edit-3" size={16}/></button>
+                                                    <button onClick={() => { if(confirm('Xóa đơn hàng này khỏi lịch sử?')) setHistory(history.filter(item => item.id !== h.id)); }} className="p-2 bg-red-50 rounded-xl text-red-300 hover:text-red-500 transition-colors"><Icon name="trash-2" size={16}/></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PREPARING VIEW */}
+                    {activeTab === 'preparing' && (
+                        <div className="flex-1 p-6 overflow-y-auto bg-slate-50/50 text-center py-20">
+                            {orders.length === 0 ? <p className="opacity-20 font-black uppercase tracking-widest italic text-2xl">Trống hàng chờ</p> : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {orders.map(order => (
+                                        <div key={order.id} className="bg-white rounded-[2.5rem] text-left border-2 border-slate-100 shadow-sm p-6 flex flex-col">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Token #{order.token}</span><h4 className="font-black text-lg uppercase italic text-slate-800">{order.customer}</h4></div>
+                                                <button onClick={() => handleDeleteWaitingOrder(order.id)} className="p-2 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors"><Icon name="trash-2" size={18} /></button>
+                                            </div>
+                                            <div className="flex-1 space-y-2 mb-4 border-t pt-4">
+                                                {order.items.map((item, idx) => (
+                                                    <div key={idx} className="flex justify-between text-xs font-bold text-slate-700 uppercase"><span>{item.name} x{item.quantity}</span><span className="text-emerald-600">{(item.price * item.quantity).toLocaleString()}đ</span></div>
+                                                ))}
+                                            </div>
+                                            <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                                                <div className="text-right"><p className="text-xs text-slate-500">Tổng</p><p className="text-xl font-black text-emerald-600">{order.total.toLocaleString()}đ</p></div>
+                                                <button onClick={() => handlePayment(order.id)} className="px-6 py-4 bg-emerald-500 text-white rounded-2xl font-black text-xs uppercase shadow-lg active:scale-95 transition-all">Hoàn tất & Trừ kho</button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </main>
+
+            {/* MODALS POS */}
+            {editingHistoryItem && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-2xl p-8 shadow-2xl max-h-[90vh] flex flex-col">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Chỉnh sửa đơn #{editingHistoryItem.token}</h3>
+                        <div className="space-y-6 flex-1 overflow-y-auto">
+                            <div>
+                                <label className="text-xs font-black uppercase text-slate-400 block mb-2">Khách hàng</label>
+                                <input value={editingHistoryItem.customer || ''} onChange={e => setEditingHistoryItem({...editingHistoryItem, customer: e.target.value})} className="w-full p-4 bg-slate-100 rounded-xl font-bold border-none outline-none" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black uppercase mb-3">Mặt hàng</h4>
+                                <div className="space-y-3">
+                                    {editingHistoryItem.items.map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl">
+                                            <div className="flex-1">
+                                                <p className="font-black text-slate-800">{item.name}</p>
+                                                <p className="text-sm text-emerald-600">{item.price.toLocaleString()}đ / sp</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <button onClick={() => { const newItems = [...editingHistoryItem.items]; if (newItems[idx].quantity > 1) { newItems[idx].quantity -= 1; } else { newItems.splice(idx, 1); } setEditingHistoryItem({...editingHistoryItem, items: newItems}); }} className="p-2 bg-slate-200 rounded-lg hover:bg-slate-300"><Icon name="minus" size={16} /></button>
+                                                <span className="w-12 text-center font-black text-lg">{item.quantity}</span>
+                                                <button onClick={() => { const newItems = [...editingHistoryItem.items]; newItems[idx].quantity = (newItems[idx].quantity || 1) + 1; setEditingHistoryItem({...editingHistoryItem, items: newItems}); }} className="p-2 bg-slate-200 rounded-lg hover:bg-slate-300"><Icon name="plus" size={16} /></button>
+                                                <button onClick={() => { if (confirm(`Xóa ${item.name}?`)) { const newItems = editingHistoryItem.items.filter((_, i) => i !== idx); setEditingHistoryItem({...editingHistoryItem, items: newItems}); } }} className="p-2 bg-red-100 text-red-600 rounded-lg ml-2 hover:bg-red-200"><Icon name="trash-2" size={16} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="pt-4"><p className="text-sm font-black">Tổng tiền mới: <span className="text-emerald-600 text-xl">{editingHistoryItem.items.reduce((sum, i) => sum + (i.price * (i.quantity || 1)), 0).toLocaleString()}đ</span></p></div>
+                        </div>
+                        <div className="pt-6 flex gap-4 border-t mt-6">
+                            <button onClick={handleUpdateHistory} className="flex-1 py-5 bg-emerald-600 text-white rounded-2xl font-black uppercase shadow-xl active:scale-95 transition-all">Lưu thay đổi</button>
+                            <button onClick={() => setEditingHistoryItem(null)} className="flex-1 py-5 bg-slate-200 text-slate-700 rounded-2xl font-black uppercase hover:bg-slate-300 transition-all">Hủy</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showIngModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-md p-8 shadow-2xl">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Thông tin hàng hóa</h3>
+                        <div className="mb-4 bg-blue-50 p-4 rounded-2xl border border-blue-100">
+                            <label className="text-[10px] font-black text-blue-400 uppercase block mb-2">Thêm nhóm hàng mới</label>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Vd: Đồ khô..." className="flex-1 p-3 bg-white rounded-xl text-xs font-bold outline-none border-none" value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} />
+                                <button onClick={addCategory} type="button" className="bg-blue-500 text-white px-4 rounded-xl font-black text-xs uppercase">+</button>
+                            </div>
+                        </div>
+                        <form onSubmit={handleIngSubmit} className="space-y-4">
+                            <input name="name" defaultValue={editingIng?.name} placeholder="Tên hàng hóa" className="w-full p-4 bg-slate-100 rounded-xl font-bold border-none outline-none" required />
+                            <div className="grid grid-cols-2 gap-4">
+                                <input name="unit" defaultValue={editingIng?.unit} placeholder="Đơn vị (Kg, Lon...)" className="w-full p-4 bg-slate-100 rounded-xl font-bold border-none outline-none" required />
+                                <select name="category" defaultValue={editingIng?.category || ''} className="w-full p-4 bg-slate-100 rounded-xl font-bold border-none outline-none">
+                                    <option value="">Chọn nhóm...</option>
+                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <input name="costPrice" type="number" defaultValue={editingIng?.lastPrice} placeholder="Giá nhập" className="w-full p-4 bg-slate-100 rounded-xl font-bold border-none outline-none" />
+                                <input name="sellPrice" type="number" defaultValue={editingIng?.sellPrice} placeholder="Giá bán (Lẻ)" className="w-full p-4 bg-blue-50 rounded-xl font-black text-blue-600 border-none outline-none" />
+                            </div>
+                            <input name="stock" type="number" step="0.001" defaultValue={editingIng?.stock || 0} placeholder="Số lượng kho" className="w-full p-4 bg-emerald-50 rounded-xl font-black text-emerald-700 border-none outline-none" />
+                            <button className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black uppercase shadow-xl active:scale-95 transition-all">Lưu hàng hóa</button>
+                            <button type="button" onClick={() => setShowIngModal(false)} className="w-full py-2 text-slate-300 font-bold uppercase text-[10px]">Đóng</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {showAddMenu && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-8 shadow-2xl">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Thêm món mới</h3>
+                        <div className="mb-4 bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                            <label className="text-[10px] font-black text-emerald-400 uppercase block mb-2">Thêm nhóm hàng mới</label>
+                            <div className="flex gap-2">
+                                <input type="text" placeholder="Vd: Giải khát..." className="flex-1 p-3 bg-white rounded-xl text-xs font-bold outline-none border-none" value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} />
+                                <button onClick={addCategory} type="button" className="bg-emerald-500 text-white px-4 rounded-xl font-black text-xs uppercase">+</button>
+                            </div>
+                        </div>
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            if (!newProductForm.name) return alert('Vui lòng nhập tên món');
+                            const validVariants = newProductForm.variants.filter(v => v.size && v.price && !isNaN(parseInt(v.price)));
+                            if (validVariants.length === 0) return alert('Vui lòng nhập ít nhất một size và giá hợp lệ');
+                            setProducts([...products, { id: Date.now(), name: newProductForm.name, category: newProductForm.category, variants: validVariants.map(v => ({ size: v.size.toUpperCase(), price: parseInt(v.price) })), recipe: [] }]);
+                            setShowAddMenu(false);
+                            setNewProductForm({ name: '', category: '', variants: [{ size: 'S', price: '' }, { size: 'M', price: '' }, { size: 'L', price: '' }] });
+                        }} className="space-y-4">
+                            <input value={newProductForm.name} onChange={e => setNewProductForm({...newProductForm, name: e.target.value})} placeholder="Tên món" className="w-full p-4 bg-slate-100 rounded-xl font-bold outline-none" required />
+                            <select value={newProductForm.category} onChange={e => setNewProductForm({...newProductForm, category: e.target.value})} className="w-full p-4 bg-slate-100 rounded-xl font-bold outline-none">
+                                <option value="">Chọn nhóm...</option>
+                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                            <div className="border-t pt-4">
+                                <h4 className="text-sm font-black mb-3">Biến thể (Size & Giá)</h4>
+                                {newProductForm.variants.map((v, index) => (
+                                    <div key={index} className="flex gap-3 mb-3 items-center">
+                                        <input value={v.size} onChange={e => updateVariant(index, 'size', e.target.value)} placeholder="Size (S/M/L/XL)" className="flex-1 p-3 bg-slate-100 rounded-xl text-sm font-bold outline-none" />
+                                        <input type="number" value={v.price} onChange={e => updateVariant(index, 'price', e.target.value)} placeholder="Giá" className="flex-1 p-3 bg-slate-100 rounded-xl text-sm font-bold outline-none" />
+                                        <button type="button" onClick={() => removeVariant(index)} className="p-2 bg-red-100 text-red-600 rounded-lg"><Icon name="trash-2" size={16} /></button>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={addVariant} className="w-full py-3 bg-slate-200 text-slate-700 rounded-xl font-black text-sm">+ Thêm size mới</button>
+                            </div>
+                            <button className="w-full py-5 bg-emerald-500 text-white rounded-2xl font-black uppercase shadow-xl">Lưu món mới</button>
+                            <button type="button" onClick={() => setShowAddMenu(false)} className="w-full py-2 text-slate-300 font-bold uppercase text-[10px]">Đóng</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {editingRecipeProduct && (
+                <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-[150] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[3rem] w-full max-w-2xl h-[85vh] flex flex-col overflow-hidden shadow-2xl">
+                        <div className="p-8 border-b flex justify-between items-center bg-slate-50">
+                            <h3 className="font-black text-xl uppercase italic tracking-tighter text-slate-800">Định mức cho: {editingRecipeProduct.name}</h3>
+                            <button onClick={() => setEditingRecipeProduct(null)} className="text-slate-400 hover:text-slate-900"><Icon name="x" size={24}/></button>
+                        </div>
+                        <div className="flex-1 flex overflow-hidden">
+                            <div className="w-1/2 border-r p-6 overflow-y-auto bg-slate-50/30">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 italic">Nguyên liệu hiện có</h4>
+                                <div className="space-y-2">
+                                    {ingredients.map(ing => (
+                                        <button key={ing.id} onClick={() => {
+                                            if (editingRecipeProduct.recipe.find(r => r.ingId === ing.id)) return;
+                                            setEditingRecipeProduct({...editingRecipeProduct, recipe: [...editingRecipeProduct.recipe, { ingId: ing.id, name: ing.name, unit: ing.unit, amount: 0 }]});
+                                        }} className="w-full text-left p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-500 flex justify-between items-center group">
+                                            <span className="font-black text-[11px] uppercase text-slate-600">{ing.name}</span>
+                                            <Icon name="plus-circle" size={16} className="text-slate-200 group-hover:text-emerald-500" />
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div className="w-1/2 p-6 flex flex-col bg-white">
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 italic">Định mức sử dụng</h4>
+                                <div className="flex-1 overflow-y-auto space-y-4">
+                                    {editingRecipeProduct.recipe.map(r => (
+                                        <div key={r.ingId} className="bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className="font-black text-[10px] uppercase text-slate-700">{r.name}</span>
+                                                <button onClick={() => setEditingRecipeProduct({...editingRecipeProduct, recipe: editingRecipeProduct.recipe.filter(x => x.ingId !== r.ingId)})} className="text-slate-300 hover:text-red-500"><Icon name="x-circle" size={14}/></button>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <input type="number" step="0.001" value={r.amount} onChange={(e) => setEditingRecipeProduct({...editingRecipeProduct, recipe: editingRecipeProduct.recipe.map(x => x.ingId === r.ingId ? {...x, amount: parseFloat(e.target.value) || 0} : x)})} className="flex-1 bg-white p-2 rounded-xl text-center font-black text-sm outline-none shadow-inner border-none" />
+                                                <span className="text-[9px] font-bold text-slate-400 uppercase w-10">{r.unit}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <button onClick={() => { setProducts(products.map(p => p.id === editingRecipeProduct.id ? editingRecipeProduct : p)); setEditingRecipeProduct(null); }} className="mt-6 w-full py-5 bg-emerald-600 text-white rounded-[1.5rem] font-black uppercase">Lưu định mức</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div className="fixed bottom-8 left-8 z-[999] flex flex-col gap-3 pointer-events-none">
+                {notifications.map((notif) => (
+                    <div key={notif.id} className={`flex items-center gap-3 px-6 py-4 rounded-3xl shadow-2xl text-sm font-bold max-w-[320px] transition-all duration-300 border ${notif.type === 'success' ? 'bg-emerald-600 text-white border-emerald-400' : 'bg-red-600 text-white'}`}>
+                        <Icon name={notif.type === 'success' ? "check-circle" : "alert-triangle"} size={20} />
+                        <span>{notif.message}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
+// ==========================================
+// COMPONENT: MAIN ROUTER
+// ==========================================
+const SmartPOSSystem = () => {
+    const [currentRoute, setCurrentRoute] = useState('pos'); // 'pos' or 'admin'
+
+    if (currentRoute === 'admin') {
+        return <AppAdmin onNavigateBack={() => setCurrentRoute('pos')} />;
+    }
+    
+    return <AppPOS onNavigateAdmin={() => setCurrentRoute('admin')} />;
+};
+
+// Khởi chạy App
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<SmartPOSSystem />);
