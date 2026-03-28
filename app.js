@@ -291,6 +291,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
     const [editingHistoryItem, setEditingHistoryItem] = useState(null);
+    
+    // CATEGORY Modal States
+    const [showCatModal, setShowCatModal] = useState(false);
+    const [editingCat, setEditingCat] = useState({ old: '', new: '' });
 
     // User States
     const [users, setUsers] = useState(() => {
@@ -453,6 +457,49 @@ const AppPOS = ({ onNavigateAdmin }) => {
             setNewCatInput('');
             showNotification('Thêm danh mục thành công', 'success');
         }
+    };
+    
+    // --- HÀM XỬ LÝ XÓA / ĐỔI TÊN DANH MỤC ---
+    const handleDeleteCategory = (catToDelete) => {
+        if (categories.length <= 1) {
+            showNotification("Phải giữ lại ít nhất 1 danh mục!", "error");
+            return;
+        }
+        if (confirm(`Bạn có chắc muốn xóa danh mục "${catToDelete}"? Các món thuộc danh mục này sẽ tự động chuyển sang danh mục "Khác".`)) {
+            let newCategories = categories.filter(c => c !== catToDelete);
+            if (!newCategories.includes('Khác')) newCategories.push('Khác');
+            
+            setCategories(newCategories);
+            if (selectedCategory === catToDelete) setSelectedCategory('Tất cả');
+
+            // Cập nhật lại sản phẩm & nguyên liệu
+            setIngredients(prev => prev.map(ing => ing.category === catToDelete ? { ...ing, category: 'Khác' } : ing));
+            setProducts(prev => prev.map(p => p.category === catToDelete ? { ...p, category: 'Khác' } : p));
+            
+            showNotification(`Đã xóa danh mục ${catToDelete}`, 'success');
+        }
+    };
+
+    const handleEditCategory = (oldCat, newCat) => {
+        const trimmedNew = newCat.trim();
+        if (!trimmedNew || trimmedNew === oldCat) {
+            setEditingCat({old: '', new: ''});
+            return;
+        }
+        if (categories.includes(trimmedNew)) {
+            showNotification("Tên danh mục đã tồn tại!", "error");
+            return;
+        }
+        
+        setCategories(categories.map(c => c === oldCat ? trimmedNew : c));
+        if (selectedCategory === oldCat) setSelectedCategory(trimmedNew);
+
+        // Đổi tên đồng loạt trong sản phẩm & nguyên liệu
+        setIngredients(prev => prev.map(ing => ing.category === oldCat ? { ...ing, category: trimmedNew } : ing));
+        setProducts(prev => prev.map(p => p.category === oldCat ? { ...p, category: trimmedNew } : p));
+        
+        setEditingCat({old: '', new: ''});
+        showNotification(`Đã đổi tên thành ${trimmedNew}`, 'success');
     };
 
     const addToCart = (item) => {
@@ -718,10 +765,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     {activeTab === 'inventory' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
                             <div className="flex gap-2 mb-4">
-                                <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng mới</button>
-                                <div className="flex flex-1 max-w-[200px]">
-                                    <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="w-full px-3 text-xs bg-slate-100 rounded-l-xl outline-none border-none font-bold" />
-                                    <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-r-xl"><Icon name="plus" size={16} /></button>
+                                <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng</button>
+                                <div className="flex flex-1 max-w-[220px] gap-1">
+                                    <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="w-full px-3 text-xs bg-slate-100 rounded-lg outline-none border-none font-bold" />
+                                    <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-lg"><Icon name="plus" size={16} /></button>
+                                    <button onClick={() => setShowCatModal(true)} className="bg-slate-200 text-slate-600 px-3 rounded-lg hover:bg-slate-300 transition-colors"><Icon name="settings" size={16} /></button>
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -905,6 +953,43 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-2xl font-black uppercase shadow-xl text-xs">Tạo món</button>
                         <button type="button" onClick={() => setShowAddMenu(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-2">Hủy bỏ</button>
                     </form>
+                </div>
+            )}
+
+            {/* MODAL QUẢN LÝ DANH MỤC (MỚI THÊM) */}
+            {showCatModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-black uppercase italic mb-6">Quản lý danh mục</h3>
+                        
+                        <div className="space-y-3 mb-6">
+                            {categories.map(cat => (
+                                <div key={cat} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                    {editingCat.old === cat ? (
+                                        <div className="flex flex-1 gap-2">
+                                            <input 
+                                                autoFocus
+                                                value={editingCat.new} 
+                                                onChange={(e) => setEditingCat({...editingCat, new: e.target.value})}
+                                                className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200 text-sm font-bold outline-none"
+                                            />
+                                            <button onClick={() => handleEditCategory(editingCat.old, editingCat.new)} className="p-2 bg-emerald-500 text-white rounded-lg"><Icon name="check" size={16}/></button>
+                                            <button onClick={() => setEditingCat({old: '', new: ''})} className="p-2 bg-slate-200 text-slate-600 rounded-lg"><Icon name="x" size={16}/></button>
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <span className="font-bold text-sm text-slate-700 flex-1">{cat}</span>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setEditingCat({old: cat, new: cat})} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Icon name="edit-3" size={16}/></button>
+                                                <button onClick={() => handleDeleteCategory(cat)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Icon name="trash-2" size={16}/></button>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                        <button type="button" onClick={() => setShowCatModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all">Đóng</button>
+                    </div>
                 </div>
             )}
 
