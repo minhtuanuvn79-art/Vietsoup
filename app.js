@@ -24,32 +24,25 @@ const USERS_KEY = 'SMART_POS_USERS';
 const CURRENT_USER_KEY = 'SMART_POS_CURRENT_USER';
 
 // --- SHARED COMPONENTS (ĐÃ VÁ LỖI REMOVE CHILD) ---
-const Icon = ({ name, size = 16, className = '', ...props }) => {
+const Icon = ({ name, size = 16, className = '', style, ...props }) => {
     const elRef = useRef(null);
     
-    // Lọc các props không dùng để in ra chuỗi HTML
-    const iconAttrs = Object.keys(props)
-        .filter(key => typeof props[key] !== 'function' && key !== 'style')
-        .map(key => `${key}="${props[key]}"`)
-        .join(' ');
-
-    // Sử dụng dangerouslySetInnerHTML để giấu thẻ <i> khỏi Virtual DOM của React
-    const htmlStr = `<i data-lucide="${name}" style="width: ${size}px; height: ${size}px" ${iconAttrs}></i>`;
-
     useEffect(() => {
         if (elRef.current && window.lucide) {
-            // Chỉ yêu cầu Lucide quét bên trong phạm vi thẻ span này, an toàn tuyệt đối
+            // Render thẻ i vào bên trong span, cho phép Lucide biến đổi thoải mái
+            // mà không làm ảnh hưởng tới Virtual DOM của React
+            elRef.current.innerHTML = `<i data-lucide="${name}" style="width: ${size}px; height: ${size}px;"></i>`;
             window.lucide.createIcons({ root: elRef.current });
         }
-    }, [htmlStr]);
+    }, [name, size]);
 
+    // React chỉ quản lý thẻ span bọc ngoài này
     return (
         <span 
             ref={elRef} 
-            className={`inline-flex items-center justify-center ${className}`} 
-            style={props.style} 
-            onClick={props.onClick}
-            dangerouslySetInnerHTML={{ __html: htmlStr }}
+            className={`inline-flex items-center justify-center shrink-0 ${className}`}
+            style={{ width: size, height: size, ...style }} 
+            {...props}
         />
     );
 };
@@ -758,7 +751,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
             <div className="flex h-[100dvh] bg-[#F8FAFC] items-center justify-center p-4">
                 <div className="bg-white rounded-[2rem] p-8 w-full max-w-md shadow-2xl">
                     <div className="flex justify-center mb-6">
-                        <div className="bg-emerald-500 p-4 rounded-2xl"><Icon name="zap" size={40} fill="white" /></div>
+                        <div className="bg-emerald-500 p-4 rounded-2xl"><Icon name="zap" size={40} className="text-white" /></div>
                     </div>
                     <h1 className="text-2xl font-black uppercase italic text-center mb-2">SMART POS</h1>
                     <p className="text-center text-slate-500 mb-8 text-sm">Đăng nhập để tiếp tục</p>
@@ -777,7 +770,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         <div className="flex h-[100dvh] w-full bg-[#F8FAFC] overflow-hidden flex-col md:flex-row text-slate-900 font-sans">
             <aside className="hidden md:flex w-24 lg:w-64 bg-[#0F172A] text-white flex-col shrink-0">
                 <div className="p-6 border-b border-white/5 flex items-center gap-3">
-                    <div className="bg-emerald-500 p-2 rounded-xl"><Icon name="zap" fill="white" /></div>
+                    <div className="bg-emerald-500 p-2 rounded-xl"><Icon name="zap" className="text-white" /></div>
                     <span className="font-black text-lg hidden lg:block uppercase italic text-emerald-400">Smart POS</span>
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
@@ -789,7 +782,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     {currentUser.role === 'admin' && <SidebarItem icon="users" label="Quản Trị" active={false} onClick={onNavigateAdmin} />}
                 </nav>
                 <div className="p-4 border-t border-white/10 text-center text-xs text-slate-400">
-                    <button onClick={handleLogout} className="w-full py-3 bg-white/10 rounded-xl font-bold uppercase text-white"><Icon name="log-out" className="inline mr-2" /> Đăng xuất</button>
+                    <button onClick={handleLogout} className="w-full py-3 bg-white/10 rounded-xl font-bold uppercase text-white"><Icon name="log-out" className="mr-2" /> Đăng xuất</button>
                 </div>
             </aside>
 
@@ -906,10 +899,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden pb-24 md:pb-6">
                             {/* MENU QUẢN LÝ KHO */}
                             <div className="flex gap-2 mb-4 border-b border-slate-200 pb-3 overflow-x-auto no-scrollbar shrink-0">
-                                <button onClick={() => setInventoryTab('stock')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'stock' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="database" size={14} className="inline mr-1 -mt-1"/>Tồn kho</button>
-                                <button onClick={() => setInventoryTab('import')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'import' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="package-plus" size={14} className="inline mr-1 -mt-1"/>Nhập hàng</button>
-                                <button onClick={() => setInventoryTab('stocktake')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'stocktake' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="clipboard-check" size={14} className="inline mr-1 -mt-1"/>Kiểm kho</button>
-                                <button onClick={() => setInventoryTab('history')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'history' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="history" size={14} className="inline mr-1 -mt-1"/>Lịch sử kho</button>
+                                <button onClick={() => setInventoryTab('stock')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'stock' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="database" size={14} className="mr-1 -mt-1"/>Tồn kho</button>
+                                <button onClick={() => setInventoryTab('import')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'import' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="package-plus" size={14} className="mr-1 -mt-1"/>Nhập hàng</button>
+                                <button onClick={() => setInventoryTab('stocktake')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'stocktake' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="clipboard-check" size={14} className="mr-1 -mt-1"/>Kiểm kho</button>
+                                <button onClick={() => setInventoryTab('history')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'history' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="history" size={14} className="mr-1 -mt-1"/>Lịch sử kho</button>
                             </div>
 
                             {/* TAB: TỒN KHO */}
@@ -1101,7 +1094,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                                 <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                                                     <span>{new Date(trans.timestamp).toLocaleString('vi-VN')}</span>
-                                                    <span className="uppercase"><Icon name="user" size={10} className="inline mr-1" />{trans.seller}</span>
+                                                    <span className="uppercase"><Icon name="user" size={10} className="mr-1" />{trans.seller}</span>
                                                 </div>
                                             </div>
                                         ))
@@ -1125,7 +1118,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             ))}
                                         </div>
                                         <div className="flex gap-2 border-t pt-2 mt-2">
-                                            <button onClick={() => {if(confirm('Bạn muốn xoá món này?')) setProducts(products.filter(item => item.id !== p.id))}} className="w-full py-2 bg-red-50 text-red-500 rounded-lg text-[10px] font-black uppercase"><Icon name="trash-2" size={14} className="inline mr-1"/> Xóa món</button>
+                                            <button onClick={() => {if(confirm('Bạn muốn xoá món này?')) setProducts(products.filter(item => item.id !== p.id))}} className="w-full py-2 bg-red-50 text-red-500 rounded-lg text-[10px] font-black uppercase"><Icon name="trash-2" size={14} className="mr-1"/> Xóa món</button>
                                         </div>
                                     </div>
                                 ))}
@@ -1205,7 +1198,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             <p className="text-xs text-slate-600 mb-3 bg-slate-50 p-2 rounded-lg font-medium">{h.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
                                             <div className="flex justify-between items-center text-[10px] font-bold text-slate-400">
                                                 <span>{new Date(h.timestamp).toLocaleString('vi-VN')}</span>
-                                                <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="inline mr-1" />{h.seller}</span>
+                                                <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="mr-1" />{h.seller}</span>
                                             </div>
                                         </div>
                                     ))
