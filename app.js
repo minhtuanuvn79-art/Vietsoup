@@ -282,7 +282,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [notifications, setNotifications] = useState([]);
     
     // Inventory Sub-tabs State
-    const [inventoryTab, setInventoryTab] = useState('stock'); // 'stock', 'import', 'stocktake', 'history'
+    const [inventoryTab, setInventoryTab] = useState('stock'); 
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
     const [stocktakeList, setStocktakeList] = useState([]);
@@ -633,19 +633,21 @@ const AppPOS = ({ onNavigateAdmin }) => {
     }, [users, history]);
 
     // ==========================================
-    // LOGIC NHẬP HÀNG & KIỂM KHO
+    // LOGIC NHẬP HÀNG & KIỂM KHO (ĐÃ VÁ LỖI)
     // ==========================================
     
     // 1. NHẬP HÀNG
     const addToImport = (ing) => {
         if (!importCart.find(i => i.id === ing.id)) {
-            setImportCart([{ ...ing, importQty: 1, importPrice: ing.lastPrice || 0 }, ...importCart]);
+            // FIX LỖI: Lưu dữ liệu kiểu Chuỗi (String) để cho phép người dùng gõ/xóa tự do trên input
+            setImportCart([{ ...ing, importQty: '1', importPrice: String(ing.lastPrice || 0) }, ...importCart]);
         }
         setImportSearch('');
     };
 
     const updateImportCart = (id, field, value) => {
-        setImportCart(prev => prev.map(item => item.id === id ? { ...item, [field]: parseFloat(value) || 0 } : item));
+        // FIX LỖI: Không ép kiểu số ngay lúc nhập liệu nữa
+        setImportCart(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
     };
 
     const removeFromImport = (id) => {
@@ -655,21 +657,28 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const handleCompleteImport = () => {
         if (importCart.length === 0) return;
         
+        // FIX LỖI: Xử lý chuỗi thành số thực tế ngay trước khi lưu
+        const processedImport = importCart.map(item => ({
+            ...item,
+            finalQty: parseFloat(item.importQty) || 0,
+            finalPrice: parseFloat(item.importPrice) || 0
+        }));
+        
         const updatedIngredients = ingredients.map(ing => {
-            const importedItem = importCart.find(item => item.id === ing.id);
+            const importedItem = processedImport.find(item => item.id === ing.id);
             if (importedItem) {
-                return { ...ing, stock: ing.stock + importedItem.importQty, lastPrice: importedItem.importPrice };
+                return { ...ing, stock: ing.stock + importedItem.finalQty, lastPrice: importedItem.finalPrice };
             }
             return ing;
         });
         setIngredients(updatedIngredients);
 
-        const totalCost = importCart.reduce((sum, item) => sum + (item.importQty * item.importPrice), 0);
+        const totalCost = processedImport.reduce((sum, item) => sum + (item.finalQty * item.finalPrice), 0);
         const transaction = {
             id: `IMP${Date.now()}`,
             type: 'import',
             timestamp: new Date().toISOString(),
-            items: importCart.map(i => ({ name: i.name, qty: i.importQty, price: i.importPrice })),
+            items: processedImport.map(i => ({ name: i.name, qty: i.finalQty, price: i.finalPrice })),
             total: totalCost,
             seller: currentUser.name
         };
@@ -682,21 +691,33 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
     // 2. KIỂM KHO
     const startStocktake = () => {
-        setStocktakeList(ingredients.map(i => ({ ...i, actualStock: i.stock })));
+        // FIX LỖI: Chặn tạo phiếu nếu kho trống để tránh hiện tượng không phản hồi
+        if (ingredients.length === 0) {
+            showNotification("Kho đang trống, không có hàng hóa để kiểm!", "error");
+            return;
+        }
+        // FIX LỖI: Dùng kiểu String để tránh Input bị đơ khi xóa số
+        setStocktakeList(ingredients.map(i => ({ ...i, actualStockInput: String(i.stock) })));
     };
 
-    const updateStocktake = (id, actualStock) => {
-        setStocktakeList(prev => prev.map(item => item.id === id ? { ...item, actualStock: parseFloat(actualStock) || 0 } : item));
+    const updateStocktake = (id, rawValue) => {
+        setStocktakeList(prev => prev.map(item => item.id === id ? { ...item, actualStockInput: rawValue } : item));
     };
 
     const handleCompleteStocktake = () => {
         if (stocktakeList.length === 0) return;
 
-        const changedItems = stocktakeList.filter(item => item.stock !== item.actualStock);
+        // FIX LỖI: Chuẩn hóa lại các số liệu nhập tay về kiểu Số chuẩn
+        const processedList = stocktakeList.map(item => ({
+            ...item,
+            finalActual: parseFloat(item.actualStockInput) || 0
+        }));
+
+        const changedItems = processedList.filter(item => item.stock !== item.finalActual);
         
         const updatedIngredients = ingredients.map(ing => {
-            const stItem = stocktakeList.find(item => item.id === ing.id);
-            return stItem ? { ...ing, stock: stItem.actualStock } : ing;
+            const stItem = processedList.find(item => item.id === ing.id);
+            return stItem ? { ...ing, stock: stItem.finalActual } : ing;
         });
         
         setIngredients(updatedIngredients);
@@ -706,7 +727,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 id: `STK${Date.now()}`,
                 type: 'stocktake',
                 timestamp: new Date().toISOString(),
-                items: changedItems.map(i => ({ name: i.name, oldStock: i.stock, newStock: i.actualStock, diff: i.actualStock - i.stock })),
+                items: changedItems.map(i => ({ name: i.name, oldStock: i.stock, newStock: i.finalActual, diff: parseFloat((i.finalActual - i.stock).toFixed(2)) })),
                 total: 0,
                 seller: currentUser.name
             };
@@ -928,7 +949,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             {importCart.length === 0 ? (
                                                 <p className="text-center text-slate-400 font-bold text-xs mt-10">Chưa chọn hàng hóa nào</p>
                                             ) : (
-                                                importCart.map(item => (
+                                                importCart.map(item => {
+                                                    const currentQty = parseFloat(item.importQty) || 0;
+                                                    const currentPrice = parseFloat(item.importPrice) || 0;
+                                                    return (
                                                     <div key={item.id} className="p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
                                                         <div className="flex justify-between items-center mb-2">
                                                             <h4 className="font-black text-xs uppercase">{item.name}</h4>
@@ -937,27 +961,27 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                         <div className="flex gap-2">
                                                             <div className="flex-1">
                                                                 <label className="text-[9px] font-black uppercase text-slate-400">SL nhập ({item.unit})</label>
-                                                                <input type="number" step="0.1" value={item.importQty} onChange={(e) => updateImportCart(item.id, 'importQty', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold" />
+                                                                <input type="number" step="0.1" value={item.importQty} onChange={(e) => updateImportCart(item.id, 'importQty', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold outline-none focus:border-blue-500" />
                                                             </div>
                                                             <div className="flex-1">
                                                                 <label className="text-[9px] font-black uppercase text-slate-400">Đơn giá (đ)</label>
-                                                                <input type="number" value={item.importPrice} onChange={(e) => updateImportCart(item.id, 'importPrice', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold" />
+                                                                <input type="number" value={item.importPrice} onChange={(e) => updateImportCart(item.id, 'importPrice', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold outline-none focus:border-blue-500" />
                                                             </div>
                                                             <div className="flex-1">
                                                                 <label className="text-[9px] font-black uppercase text-slate-400">Thành tiền</label>
-                                                                <div className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-black text-emerald-600 text-right">
-                                                                    {(item.importQty * item.importPrice).toLocaleString()}đ
+                                                                <div className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-black text-emerald-600 text-right overflow-hidden text-ellipsis">
+                                                                    {(currentQty * currentPrice).toLocaleString()}đ
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
-                                                ))
+                                                )})
                                             )}
                                         </div>
                                         <div className="p-4 border-t border-slate-100 bg-white shrink-0">
                                             <div className="flex justify-between items-center mb-4">
                                                 <span className="font-black text-xs uppercase text-slate-500">Tổng tiền nhập</span>
-                                                <span className="font-black text-xl text-blue-600">{importCart.reduce((sum, item) => sum + (item.importQty * item.importPrice), 0).toLocaleString()}đ</span>
+                                                <span className="font-black text-xl text-blue-600">{importCart.reduce((sum, item) => sum + ((parseFloat(item.importQty)||0) * (parseFloat(item.importPrice)||0)), 0).toLocaleString()}đ</span>
                                             </div>
                                             <button onClick={handleCompleteImport} disabled={importCart.length === 0} className="w-full py-3 bg-blue-600 disabled:bg-slate-300 text-white font-black text-xs uppercase rounded-xl shadow-lg">Hoàn thành nhập hàng</button>
                                         </div>
@@ -982,7 +1006,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             </div>
                                             <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
                                                 {stocktakeList.map(item => {
-                                                    const diff = item.actualStock - item.stock;
+                                                    const actualNum = parseFloat(item.actualStockInput) || 0;
+                                                    const diff = parseFloat((actualNum - item.stock).toFixed(2));
                                                     return (
                                                         <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
                                                             <div className="flex-1 mb-2 md:mb-0">
@@ -992,7 +1017,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                             <div className="flex items-center gap-4">
                                                                 <div className="w-24">
                                                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Thực tế</label>
-                                                                    <input type="number" step="0.1" value={item.actualStock} onChange={(e) => updateStocktake(item.id, e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-black text-center outline-none focus:border-orange-500" />
+                                                                    <input type="number" step="0.1" value={item.actualStockInput} onChange={(e) => updateStocktake(item.id, e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-black text-center outline-none focus:border-orange-500" />
                                                                 </div>
                                                                 <div className="w-20 text-right">
                                                                     <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Lệch</label>
