@@ -58,6 +58,7 @@ const AppAdmin = ({ onNavigateBack }) => {
     const [isSyncing, setIsSyncing] = useState(false);
     
     const isSyncingFromCloud = useRef(false);
+    const isInitialLoad = useRef(true); // FIX: Biến cờ chặn ghi đè dữ liệu lần đầu
 
     const syncToCloud = (currentUsers) => {
         if (isSyncingFromCloud.current) return;
@@ -80,12 +81,14 @@ const AppAdmin = ({ onNavigateBack }) => {
                 localStorage.setItem(USERS_KEY, JSON.stringify(cloudUsers));
                 setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
             }
+            isInitialLoad.current = false; // FIX: Đánh dấu đã tải xong từ cloud
         });
         return () => usersRef.off();
     }, []);
 
     useEffect(() => {
-        if (!isSyncingFromCloud.current && users.length > 0) {
+        // FIX: Chặn ghi đè nếu đang tải lần đầu
+        if (!isSyncingFromCloud.current && !isInitialLoad.current && users.length > 0) {
             localStorage.setItem(USERS_KEY, JSON.stringify(users));
             syncToCloud(users);
         }
@@ -267,8 +270,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [products, setProducts] = useState(() => loadSavedData()?.products || []);
     const [history, setHistory] = useState(() => loadSavedData()?.history || []);
     const [orderCounter, setOrderCounter] = useState(() => loadSavedData()?.orderCounter || 1);
-    
-    // Đã fix lỗi categories rỗng
     const [categories, setCategories] = useState(() => loadSavedData()?.categories || ['Cà phê', 'Trà sữa', 'Đồ ăn', 'Khác']);
 
     // UI States
@@ -290,7 +291,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
-    const [editingRecipeProduct, setEditingRecipeProduct] = useState(null);
     const [editingHistoryItem, setEditingHistoryItem] = useState(null);
 
     // User States
@@ -306,6 +306,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [loginPassword, setLoginPassword] = useState('');
 
     const isSyncingFromCloud = useRef(false);
+    const isInitialLoad = useRef(true); // FIX: Cờ đánh dấu lúc khởi tạo
 
     const syncToCloud = (data, usersData) => {
         if (isSyncingFromCloud.current) return;
@@ -338,6 +339,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 
                 setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
             }
+            isInitialLoad.current = false; // FIX: Firebase trả dữ liệu về rồi, gỡ cờ chặn!
         });
 
         return () => rootRef.off();
@@ -359,7 +361,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     }, [currentUser]);
 
     useEffect(() => {
-        if (isSyncingFromCloud.current) return; 
+        // FIX: Nếu là lần render đầu tiên (hoặc đang nhận từ cloud) -> Không đẩy dữ liệu lên Firebase!
+        if (isSyncingFromCloud.current || isInitialLoad.current) return; 
         
         const data = { ingredients, products, history, orderCounter, categories };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -559,7 +562,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }); 
     };
 
-    // Hàm thêm món mới
     const handleAddProduct = (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
