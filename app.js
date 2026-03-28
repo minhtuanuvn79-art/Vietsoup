@@ -306,10 +306,14 @@ const AppPOS = ({ onNavigateAdmin }) => {
     
     // Modal States
     const [showAddMenu, setShowAddMenu] = useState(false);
+    const [editingProduct, setEditingProduct] = useState(null); // <--- THÊM STATE ĐỂ SỬA MÓN
+    
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
+    
     const [editingHistoryItem, setEditingHistoryItem] = useState(null);
     const [showHistoryEditModal, setShowHistoryEditModal] = useState(false);
+    
     const [showCatModal, setShowCatModal] = useState(false);
     const [editingCat, setEditingCat] = useState({ old: '', new: '' });
     
@@ -416,17 +420,18 @@ const AppPOS = ({ onNavigateAdmin }) => {
         localStorage.removeItem(CURRENT_USER_KEY);
     };
 
+    // Chuẩn bị dữ liệu POS hiển thị (Menu + Kho bán lẻ)
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
                 return p.variants.map(v => ({
-                    ...p, id: `${p.id}-${v.size}`, variantId: v.size, name: `${p.name} (${v.size})`, price: v.price, type: 'menu'
+                    ...p, id: `${p.id}-${v.size}`, variantId: v.size, name: `${p.name} (${v.size})`, price: v.price, costPrice: v.costPrice || 0, type: 'menu'
                 }));
             }
-            return [{ ...p, type: 'menu' }];
+            return [{ ...p, type: 'menu', costPrice: 0 }];
         });
         const retailItems = ingredients.filter(i => i.sellPrice > 0).map(i => ({ 
-            id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail' 
+            id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice, costPrice: i.lastPrice || 0, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail' 
         }));
         
         return [...processedProducts, ...retailItems].filter(item => {
@@ -462,9 +467,17 @@ const AppPOS = ({ onNavigateAdmin }) => {
         });
     }, [history, reportFilter, startDate, endDate, selectedSeller]);
 
+    // Báo cáo tính Lợi nhuận = Doanh thu - Giá vốn
     const reportStats = useMemo(() => {
-        const total = filteredHistory.reduce((sum, h) => sum + h.total, 0);
-        return { total, count: filteredHistory.length };
+        let totalRevenue = 0;
+        let totalCost = 0;
+        filteredHistory.forEach(h => {
+            totalRevenue += h.total;
+            h.items.forEach(item => {
+                totalCost += (item.costPrice || 0) * item.quantity;
+            });
+        });
+        return { total: totalRevenue, profit: totalRevenue - totalCost, count: filteredHistory.length };
     }, [filteredHistory]);
 
     const stats = useMemo(() => ({
@@ -544,7 +557,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
             token: orderCounter,
             customer: customerName || 'Khách lẻ',
             timestamp: new Date().toISOString(),
-            items: [...cart],
+            items: [...cart], // cart tự động mang theo costPrice từ posItems
             total: subtotal,
             seller: currentUser.name
         };
@@ -651,9 +664,29 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setShowIngModal(false);
     };
 
+    // ==========================================
+    // LOGIC THÊM & SỬA MÓN BÁN (THỰC ĐƠN)
+    // ==========================================
     const [newProductForm, setNewProductForm] = useState({
-        name: '', category: '', variants: [{ size: 'Mặc định', price: '' }]
+        name: '', category: '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '' }]
     });
+
+    const openAddProductModal = () => {
+        setEditingProduct(null);
+        setNewProductForm({ name: '', category: categories[0] || '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '' }] });
+        setShowAddMenu(true);
+    };
+
+    const openEditProductModal = (p) => {
+        setEditingProduct(p);
+        setNewProductForm({
+            name: p.name,
+            category: p.category,
+            image: p.image || '🍵',
+            variants: p.variants ? p.variants.map(v => ({...v, costPrice: v.costPrice || ''})) : [{ size: 'Mặc định', costPrice: '', price: '' }]
+        });
+        setShowAddMenu(true);
+    };
 
     const updateVariant = (index, field, value) => { 
         setNewProductForm(prev => { 
@@ -666,7 +699,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const addVariant = () => {
         setNewProductForm(prev => ({
             ...prev,
-            variants: [...prev.variants, { size: '', price: '' }]
+            variants: [...prev.variants, { size: '', costPrice: '', price: '' }]
         }));
     };
 
@@ -677,25 +710,39 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }));
     };
 
-    const handleAddProduct = (e) => {
+    const handleProductSubmit = (e) => {
         e.preventDefault();
-        const fd = new FormData(e.target);
         const validVariants = newProductForm.variants
-            .filter(v => v.price && !isNaN(parseFloat(v.price)))
-            .map(v => ({...v, price: parseFloat(v.price)}));
+            .filter(v => v.price !== '' && !isNaN(parseFloat(v.price)))
+            .map(v => ({
+                ...v, 
+                price: parseFloat(v.price), 
+                costPrice: parseFloat(v.costPrice) || 0 
+            }));
 
-        const newP = {
-            id: Date.now(),
-            name: fd.get('name'),
-            category: fd.get('category'),
-            image: fd.get('image') || '🍵',
-            variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', price: 0}]
-        };
-        
-        setProducts([...products, newP]);
+        if (editingProduct) {
+            const updatedP = {
+                ...editingProduct,
+                name: newProductForm.name,
+                category: newProductForm.category,
+                image: newProductForm.image,
+                variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', costPrice: 0, price: 0}]
+            };
+            setProducts(products.map(p => p.id === editingProduct.id ? updatedP : p));
+            showNotification("Đã cập nhật món thành công!", "success");
+        } else {
+            const newP = {
+                id: Date.now(),
+                name: newProductForm.name,
+                category: newProductForm.category,
+                image: newProductForm.image || '🍵',
+                variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', costPrice: 0, price: 0}]
+            };
+            setProducts([...products, newP]);
+            showNotification("Đã thêm món mới thành công!", "success");
+        }
         setShowAddMenu(false);
-        setNewProductForm({ name: '', category: '', variants: [{ size: 'Mặc định', price: '' }] });
-        showNotification("Đã thêm món mới thành công!", "success");
+        setEditingProduct(null);
     };
 
     const allSellers = useMemo(() => {
@@ -1018,8 +1065,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                                 <p className="text-[10px] font-bold text-slate-400 mb-2">Giá vốn: {ing.lastPrice?.toLocaleString()}đ</p>
                                                 <div className="flex gap-2 mt-3 border-t border-slate-50 pt-3">
-                                                    <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
-                                                    <button onClick={() => handleDeleteIngredient(ing.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={16}/></button>
+                                                    <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
+                                                    <button onClick={() => handleDeleteIngredient(ing.id)} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/> Xóa</button>
                                                 </div>
                                             </div>
                                         ))}
@@ -1192,9 +1239,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                                 <div className="flex gap-2">
                                                     {trans.type === 'import' && (
-                                                        <button onClick={() => { setEditingStockTrans(trans); setShowStockTransEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa tổng tiền</button>
+                                                        <button onClick={() => { setEditingStockTrans(trans); setShowStockTransEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa tổng tiền</button>
                                                     )}
-                                                    <button onClick={() => handleDeleteStockTrans(trans.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa phiếu</button>
+                                                    <button onClick={() => handleDeleteStockTrans(trans.id)} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa phiếu</button>
                                                 </div>
                                             </div>
                                         ))
@@ -1206,22 +1253,26 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'menu' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            <button onClick={() => setShowAddMenu(true)} className="w-full mb-4 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md">+ Thêm món mới</button>
+                            <button onClick={openAddProductModal} className="w-full mb-4 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md">+ Thêm món mới</button>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 {products.map(p => (
-                                    <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 relative shadow-sm">
+                                    <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 relative shadow-sm flex flex-col">
                                         <p className="font-black text-sm uppercase mb-2 pr-6">{p.name}</p>
-                                        <span className="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500 font-bold uppercase">{p.category}</span>
-                                        <div className="mt-3 space-y-1 bg-slate-50 p-2 rounded-xl">
+                                        <div><span className="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500 font-bold uppercase">{p.category}</span></div>
+                                        <div className="mt-3 space-y-1 bg-slate-50 p-2 rounded-xl flex-1">
                                             {p.variants?.map((v, i) => (
-                                                <div key={i} className="flex justify-between items-center text-xs font-bold text-emerald-600">
+                                                <div key={i} className="flex justify-between items-center text-xs font-bold text-emerald-600 border-b border-white last:border-0 pb-1 last:pb-0 mb-1 last:mb-0">
                                                     <span className="text-slate-600">Size {v.size}</span>
-                                                    <span>{v.price.toLocaleString()} đ</span>
+                                                    <div className="text-right">
+                                                        <span className="text-[9px] text-slate-400 mr-2">Vốn: {v.costPrice?.toLocaleString() || 0}đ</span>
+                                                        <span>Bán: {v.price.toLocaleString()}đ</span>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="flex gap-2 border-t border-slate-100 pt-3 mt-3">
-                                            <button onClick={() => {if(confirm('Bạn có chắc chắn muốn xoá món này khỏi thực đơn?')) setProducts(products.filter(item => item.id !== p.id))}} className="w-full py-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-[10px] font-black uppercase transition-colors"><Icon name="trash-2" size={14} className="mr-1"/> Xóa món</button>
+                                        <div className="flex gap-2 border-t border-slate-100 pt-3 mt-3 shrink-0">
+                                            <button onClick={() => openEditProductModal(p)} className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[10px] font-black uppercase transition-colors"><Icon name="edit-3" size={14} className="mr-1 inline"/> Sửa món</button>
+                                            <button onClick={() => {if(confirm('Bạn có chắc chắn muốn xoá món này khỏi thực đơn?')) setProducts(products.filter(item => item.id !== p.id))}} className="flex-1 py-2 bg-red-50 hover:bg-red-100 text-red-500 rounded-lg text-[10px] font-black uppercase transition-colors"><Icon name="trash-2" size={14} className="mr-1 inline"/> Xóa món</button>
                                         </div>
                                     </div>
                                 ))}
@@ -1271,17 +1322,19 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 )}
                             </div>
 
-                            {/* BẢNG THỐNG KÊ TỔNG */}
-                            <div className="bg-emerald-500 text-white p-5 rounded-2xl mb-4 shadow-md">
-                                <div className="flex justify-between items-center">
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase opacity-80 mb-1">Tổng doanh thu</p>
-                                        <h2 className="text-3xl font-black">{reportStats.total.toLocaleString()}đ</h2>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] font-black uppercase opacity-80 mb-1">Số đơn hàng</p>
-                                        <h2 className="text-2xl font-black">{reportStats.count}</h2>
-                                    </div>
+                            {/* BẢNG THỐNG KÊ TỔNG - KIOTVIET STYLE */}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                                <div className="bg-emerald-500 text-white p-5 rounded-2xl shadow-md">
+                                    <p className="text-[10px] font-black uppercase opacity-80 mb-1">Tổng Doanh thu</p>
+                                    <h2 className="text-xl md:text-2xl font-black">{reportStats.total.toLocaleString()}đ</h2>
+                                </div>
+                                <div className="bg-blue-500 text-white p-5 rounded-2xl shadow-md">
+                                    <p className="text-[10px] font-black uppercase opacity-80 mb-1">Lợi nhuận (Lãi)</p>
+                                    <h2 className="text-xl md:text-2xl font-black">{reportStats.profit.toLocaleString()}đ</h2>
+                                </div>
+                                <div className="bg-slate-800 text-white p-5 rounded-2xl shadow-md col-span-2 md:col-span-1">
+                                    <p className="text-[10px] font-black uppercase opacity-80 mb-1">Số hóa đơn</p>
+                                    <h2 className="text-xl md:text-2xl font-black">{reportStats.count}</h2>
                                 </div>
                             </div>
 
@@ -1304,8 +1357,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="mr-1 inline" />{h.seller}</span>
                                             </div>
                                             <div className="flex gap-2">
-                                                <button onClick={() => { setEditingHistoryItem(h); setShowHistoryEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-xs font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa thông tin</button>
-                                                <button onClick={() => handleDeleteHistoryItem(h.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-xs font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa hóa đơn</button>
+                                                <button onClick={() => { setEditingHistoryItem(h); setShowHistoryEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
+                                                <button onClick={() => handleDeleteHistoryItem(h.id)} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa hóa đơn</button>
                                             </div>
                                         </div>
                                     ))
@@ -1441,27 +1494,27 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL THÊM MÓN VÀO THỰC ĐƠN */}
+            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN */}
             {showAddMenu && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <form onSubmit={handleAddProduct} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                        <h3 className="text-xl font-black uppercase italic mb-6">Thêm món mới</h3>
+                    <form onSubmit={handleProductSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
+                        <h3 className="text-xl font-black uppercase italic mb-6">{editingProduct ? 'Sửa thông tin món' : 'Thêm món mới'}</h3>
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên Món</label>
-                                <input name="name" placeholder="vd: Trà sữa trân châu" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
+                                <input value={newProductForm.name} onChange={e => setNewProductForm({...newProductForm, name: e.target.value})} placeholder="vd: Trà sữa trân châu" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
                             </div>
                             
                             <div className="flex gap-3">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Danh mục</label>
-                                    <select name="category" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm">
+                                    <select value={newProductForm.category} onChange={e => setNewProductForm({...newProductForm, category: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm">
                                         {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                     </select>
                                 </div>
                                 <div className="w-24">
                                     <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Icon</label>
-                                    <input name="image" placeholder="🍵" defaultValue="🍵" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-center text-xl" />
+                                    <input value={newProductForm.image} onChange={e => setNewProductForm({...newProductForm, image: e.target.value})} placeholder="🍵" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-center text-xl" />
                                 </div>
                             </div>
                             
@@ -1473,25 +1526,32 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 
                                 {newProductForm.variants.map((v, idx) => (
                                     <div key={idx} className="flex gap-2 mb-3 items-end">
-                                        <div className="w-1/3">
-                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Tên Size</label>
-                                            <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="S, M, L..." className="w-full p-3 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
+                                        <div className="w-1/4">
+                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Size</label>
+                                            <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="M..." className="w-full p-3 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
+                                        </div>
+                                        <div className="flex-1">
+                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá vốn</label>
+                                            <div className="relative">
+                                                <input value={v.costPrice} type="number" onChange={(e) => updateVariant(idx, 'costPrice', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
+                                            </div>
                                         </div>
                                         <div className="flex-1">
                                             <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá bán</label>
                                             <div className="relative">
-                                                <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="Ví dụ: 30000" className="w-full p-3 pr-8 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                                                <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
+                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
                                             </div>
                                         </div>
                                         {newProductForm.variants.length > 1 && (
-                                            <button type="button" onClick={() => removeVariant(idx)} className="p-3 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"><Icon name="trash-2" size={18}/></button>
+                                            <button type="button" onClick={() => removeVariant(idx)} className="p-3 mb-0.5 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"><Icon name="trash-2" size={16}/></button>
                                         )}
                                     </div>
                                 ))}
                             </div>
                         </div>
-                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Tạo món ngay</button>
+                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu Món</button>
                         <button type="button" onClick={() => setShowAddMenu(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
                     </form>
                 </div>
@@ -1515,7 +1575,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
                             <div className="bg-orange-50 p-3 rounded-xl">
-                                <p className="text-[10px] font-bold text-orange-600 leading-relaxed"><Icon name="alert-circle" size={12} className="inline mr-1" />Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng XÓA hóa đơn (để hệ thống hoàn lại kho) và tạo đơn mới.</p>
+                                <p className="text-[10px] font-bold text-orange-600 leading-relaxed"><Icon name="alert-circle" size={12} className="inline mr-1" />Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng XÓA hóa đơn (để hệ thống tự hoàn lại kho) và tạo đơn mới.</p>
                             </div>
                         </div>
                         <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Cập nhật hóa đơn</button>
