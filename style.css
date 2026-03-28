@@ -2,6 +2,23 @@
 
 body { 
     font-family: 'Inter', sans-serif; 
+    /* Tránh overscroll trên mobile (hiệu ứng kéo dãn màn hình) */
+    overscroll-behavior-y: none;
+}
+
+/* Tối ưu trải nghiệm chạm trên Mobile */
+* {
+    -webkit-tap-highlight-color: transparent; /* Tắt màu xanh khi bấm trên điện thoại */
+    touch-action: manipulation; /* Tối ưu thao tác chạm, chống zoom kép */
+}
+
+/* Kích thước mục tiêu chuẩn cho ngón tay trên mobile */
+button, select {
+    min-height: 44px;
+}
+input[type="text"], input[type="number"], input[type="password"], input[type="date"] {
+    min-height: 44px;
+    font-size: 16px !important; /* Tránh iOS tự động zoom khi focus vào input */
 }
 
 /* Tùy chỉnh thanh cuộn */
