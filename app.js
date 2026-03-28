@@ -23,12 +23,35 @@ const STORAGE_KEY = 'SMART_POS_DATA_V5';
 const USERS_KEY = 'SMART_POS_USERS';
 const CURRENT_USER_KEY = 'SMART_POS_CURRENT_USER';
 
-// --- SHARED COMPONENTS ---
-const Icon = ({ name, size = 16, ...props }) => {
+// --- SHARED COMPONENTS (ĐÃ VÁ LỖI REMOVE CHILD) ---
+const Icon = ({ name, size = 16, className = '', ...props }) => {
+    const elRef = useRef(null);
+    
+    // Lọc các props không dùng để in ra chuỗi HTML
+    const iconAttrs = Object.keys(props)
+        .filter(key => typeof props[key] !== 'function' && key !== 'style')
+        .map(key => `${key}="${props[key]}"`)
+        .join(' ');
+
+    // Sử dụng dangerouslySetInnerHTML để giấu thẻ <i> khỏi Virtual DOM của React
+    const htmlStr = `<i data-lucide="${name}" style="width: ${size}px; height: ${size}px" ${iconAttrs}></i>`;
+
     useEffect(() => {
-        if (window.lucide) window.lucide.createIcons();
-    }, [name, size, props]);
-    return <i data-lucide={name} style={{ width: size, height: size }} {...props}></i>;
+        if (elRef.current && window.lucide) {
+            // Chỉ yêu cầu Lucide quét bên trong phạm vi thẻ span này, an toàn tuyệt đối
+            window.lucide.createIcons({ root: elRef.current });
+        }
+    }, [htmlStr]);
+
+    return (
+        <span 
+            ref={elRef} 
+            className={`inline-flex items-center justify-center ${className}`} 
+            style={props.style} 
+            onClick={props.onClick}
+            dangerouslySetInnerHTML={{ __html: htmlStr }}
+        />
+    );
 };
 
 const SidebarItem = ({ icon, label, active, onClick, badge }) => (
@@ -58,7 +81,6 @@ const AppAdmin = ({ onNavigateBack }) => {
     const [isSyncing, setIsSyncing] = useState(false);
     
     const isSyncingFromCloud = useRef(false);
-    const isInitialLoad = useRef(true);
 
     const syncToCloud = (currentUsers) => {
         if (isSyncingFromCloud.current) return;
@@ -81,13 +103,12 @@ const AppAdmin = ({ onNavigateBack }) => {
                 localStorage.setItem(USERS_KEY, JSON.stringify(cloudUsers));
                 setTimeout(() => { isSyncingFromCloud.current = false; }, 500);
             }
-            isInitialLoad.current = false;
         });
         return () => usersRef.off();
     }, []);
 
     useEffect(() => {
-        if (!isSyncingFromCloud.current && !isInitialLoad.current && users.length > 0) {
+        if (!isSyncingFromCloud.current && users.length > 0) {
             localStorage.setItem(USERS_KEY, JSON.stringify(users));
             syncToCloud(users);
         }
@@ -633,20 +654,17 @@ const AppPOS = ({ onNavigateAdmin }) => {
     }, [users, history]);
 
     // ==========================================
-    // LOGIC NHẬP HÀNG & KIỂM KHO (ĐÃ VÁ LỖI)
+    // LOGIC NHẬP HÀNG & KIỂM KHO
     // ==========================================
     
-    // 1. NHẬP HÀNG
     const addToImport = (ing) => {
         if (!importCart.find(i => i.id === ing.id)) {
-            // FIX LỖI: Lưu dữ liệu kiểu Chuỗi (String) để cho phép người dùng gõ/xóa tự do trên input
             setImportCart([{ ...ing, importQty: '1', importPrice: String(ing.lastPrice || 0) }, ...importCart]);
         }
         setImportSearch('');
     };
 
     const updateImportCart = (id, field, value) => {
-        // FIX LỖI: Không ép kiểu số ngay lúc nhập liệu nữa
         setImportCart(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
     };
 
@@ -657,7 +675,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const handleCompleteImport = () => {
         if (importCart.length === 0) return;
         
-        // FIX LỖI: Xử lý chuỗi thành số thực tế ngay trước khi lưu
         const processedImport = importCart.map(item => ({
             ...item,
             finalQty: parseFloat(item.importQty) || 0,
@@ -689,14 +706,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
         showNotification(`Nhập hàng thành công! Tổng: ${totalCost.toLocaleString()}đ`, 'success');
     };
 
-    // 2. KIỂM KHO
     const startStocktake = () => {
-        // FIX LỖI: Chặn tạo phiếu nếu kho trống để tránh hiện tượng không phản hồi
         if (ingredients.length === 0) {
             showNotification("Kho đang trống, không có hàng hóa để kiểm!", "error");
             return;
         }
-        // FIX LỖI: Dùng kiểu String để tránh Input bị đơ khi xóa số
         setStocktakeList(ingredients.map(i => ({ ...i, actualStockInput: String(i.stock) })));
     };
 
@@ -707,7 +721,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const handleCompleteStocktake = () => {
         if (stocktakeList.length === 0) return;
 
-        // FIX LỖI: Chuẩn hóa lại các số liệu nhập tay về kiểu Số chuẩn
         const processedList = stocktakeList.map(item => ({
             ...item,
             finalActual: parseFloat(item.actualStockInput) || 0
@@ -823,11 +836,28 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     ))}
                                 </div>
                             </div>
-                            
-                            <button onClick={() => setShowMobileCart(true)} className="md:hidden fixed bottom-24 right-4 bg-emerald-600 text-white w-14 h-14 rounded-full shadow-2xl z-[45] flex items-center justify-center relative">
-                                <Icon name="shopping-cart" size={24} />
-                                {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.length}</span>}
-                            </button>
+
+                            {/* THANH GIỎ HÀNG MOBILE */}
+                            {cart.length > 0 && (
+                                <div className="md:hidden fixed bottom-[84px] left-4 right-4 z-[45]">
+                                    <button onClick={() => setShowMobileCart(true)} className="w-full bg-emerald-600 text-white p-3 rounded-2xl shadow-[0_10px_25px_rgba(5,150,105,0.4)] flex items-center justify-between transition-transform active:scale-95">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative bg-white/20 p-2 rounded-xl">
+                                                <Icon name="shopping-cart" size={24} />
+                                                <span className="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-emerald-600">{cart.length}</span>
+                                            </div>
+                                            <div className="flex flex-col items-start">
+                                                <span className="font-black text-sm uppercase">Giỏ hàng</span>
+                                                <span className="text-[10px] font-medium opacity-90">Nhấn để chốt đơn</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-black text-lg">{subtotal.toLocaleString()}đ</span>
+                                            <Icon name="chevron-right" size={20} className="opacity-70" />
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
 
                             <div className="hidden md:flex w-80 lg:w-96 bg-white border-l border-slate-200 flex-col">
                                 <div className="p-4 border-b font-black text-[10px] uppercase text-slate-400 bg-slate-50">Đơn hàng #{orderCounter}</div>
@@ -886,7 +916,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             {inventoryTab === 'stock' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     <div className="flex gap-2 mb-4">
-                                        <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa mới</button>
+                                        <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa</button>
                                         <div className="flex flex-1 max-w-[220px] gap-1">
                                             <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="w-full px-3 text-xs bg-slate-100 rounded-lg outline-none border-none font-bold" />
                                             <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-lg"><Icon name="plus" size={16} /></button>
