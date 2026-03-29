@@ -414,7 +414,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         localStorage.removeItem(CURRENT_USER_KEY);
     };
 
-    // Chuẩn bị dữ liệu POS
+    // Chuẩn bị dữ liệu POS (Bán hàng)
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
@@ -435,6 +435,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
             return matchesSearch && matchesCat;
         });
     }, [products, ingredients, searchTerm, selectedCategory]);
+
+    // Chuẩn bị dữ liệu Thực Đơn (Chỉ show sản phẩm tạo trong Menu)
+    const filteredProductsForMenu = useMemo(() => {
+        return products.filter(p => selectedCategory === 'Tất cả' || p.category === selectedCategory);
+    }, [products, selectedCategory]);
 
     const filteredHistory = useMemo(() => {
         const now = new Date();
@@ -1160,10 +1165,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             {/* TAB: TỒN KHO */}
                             {inventoryTab === 'stock' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                    <div className="flex gap-2 mb-4">
+                                    <div className="flex flex-col md:flex-row gap-2 mb-4">
                                         <button onClick={() => { setEditingIng(null); setIsIngSellable(false); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa</button>
-                                        <div className="flex flex-1 max-w-[220px] gap-1">
-                                            <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="w-full px-3 text-xs bg-slate-100 rounded-lg outline-none border-none font-bold" />
+                                        <div className="flex md:max-w-[300px] gap-1">
+                                            <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="flex-1 px-3 text-xs bg-slate-100 rounded-lg outline-none border-none font-bold" />
                                             <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-lg"><Icon name="plus" size={16} /></button>
                                             <button onClick={() => setShowCatModal(true)} className="bg-slate-200 text-slate-600 px-3 rounded-lg hover:bg-slate-300 transition-colors"><Icon name="settings" size={16} /></button>
                                         </div>
@@ -1374,9 +1379,27 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'menu' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            <button onClick={openAddProductModal} className="w-full mb-4 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md">+ Thêm món mới</button>
+                            {/* THANH QUẢN LÝ DANH MỤC TRONG TAB THỰC ĐƠN */}
+                            <div className="flex flex-col md:flex-row gap-2 mb-4">
+                                <button onClick={openAddProductModal} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md">+ Thêm món mới</button>
+                                <div className="flex md:max-w-[300px] gap-1">
+                                    <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="flex-1 px-3 text-xs bg-white border border-slate-200 rounded-lg outline-none font-bold shadow-sm" />
+                                    <button onClick={addCategory} className="bg-blue-500 text-white px-3 rounded-lg shadow-sm"><Icon name="plus" size={16} /></button>
+                                    <button onClick={() => setShowCatModal(true)} className="bg-slate-200 text-slate-600 px-3 rounded-lg hover:bg-slate-300 transition-colors shadow-sm"><Icon name="settings" size={16} /></button>
+                                </div>
+                            </div>
+
+                            {/* THANH LỌC DANH MỤC - MỚI BỔ SUNG */}
+                            <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar border-b border-slate-200">
+                                <button onClick={() => setSelectedCategory('Tất cả')} className={`px-4 py-2 rounded-xl font-black text-xs whitespace-nowrap ${selectedCategory === 'Tất cả' ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Tất cả</button>
+                                {categories.map(cat => (
+                                    <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-xl font-black text-xs whitespace-nowrap ${selectedCategory === cat ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>{cat}</button>
+                                ))}
+                            </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                {products.map(p => (
+                                {filteredProductsForMenu.length === 0 && <div className="col-span-full text-center py-10 text-slate-400 font-bold text-sm">Chưa có món nào trong danh mục này</div>}
+                                {filteredProductsForMenu.map(p => (
                                     <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 relative shadow-sm flex flex-col">
                                         <p className="font-black text-sm uppercase mb-2 pr-6">{p.name}</p>
                                         <div><span className="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500 font-bold uppercase">{p.category}</span></div>
@@ -1500,7 +1523,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             </main>
 
-            {/* ĐÃ CHỈNH SỬA: CHIA ĐỀU BẰNG flex-1 VÀ justify-around */}
             <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2 shadow-[0_-10px_20px_rgba(0,0,0,0.1)] px-2">
                 <button onClick={() => setActiveTab('pos')} className={`flex-1 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'pos' ? "text-emerald-400" : "text-slate-500"}`}>
                     <Icon name="layout-grid" size={20} />
