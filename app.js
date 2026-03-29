@@ -185,7 +185,18 @@ const AppAdmin = ({ onNavigateBack }) => {
                 </div>
             </main>
 
-            {/* Các Modal Admin (Thêm/Sửa NV) được giữ nguyên như cũ... */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2">
+                <button className="text-emerald-400 flex flex-col items-center gap-1 w-full h-full justify-center">
+                    <Icon name="users" size={20} />
+                    <span className="text-[10px] font-black uppercase mt-1">Nhân viên</span>
+                </button>
+                <button onClick={onNavigateBack} className="text-slate-500 flex flex-col items-center gap-1 w-full h-full justify-center">
+                    <Icon name="arrow-left" size={20} />
+                    <span className="text-[10px] font-black uppercase mt-1">Quay lại</span>
+                </button>
+            </nav>
+
+            {/* Modal Admin */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <form onSubmit={addUser} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -295,7 +306,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
-    const [isIngSellable, setIsIngSellable] = useState(false); // Trạng thái checkbox phân loại Hàng hóa
+    const [isIngSellable, setIsIngSellable] = useState(false); 
     
     const [editingHistoryItem, setEditingHistoryItem] = useState(null);
     const [showHistoryEditModal, setShowHistoryEditModal] = useState(false);
@@ -403,8 +414,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         localStorage.removeItem(CURRENT_USER_KEY);
     };
 
-    // Chuẩn bị dữ liệu POS hiển thị (Menu + Kho bán lẻ)
-    // LỌC CHÍNH XÁC: Chỉ những hàng hóa nào tick "Bán trực tiếp" mới lọt vào tab Bán hàng
+    // Chuẩn bị dữ liệu POS
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
@@ -415,7 +425,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
             return [{ ...p, type: 'menu', costPrice: 0, recipe: [] }];
         });
         
-        // Lọc Hàng hóa Kho có tick `isSellable` (hoặc dữ liệu cũ có giá bán lẻ > 0 để tương thích ngược)
         const retailItems = ingredients.filter(i => i.isSellable === true || (i.isSellable === undefined && i.sellPrice > 0)).map(i => ({ 
             id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice || 0, costPrice: i.lastPrice || 0, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail', recipe: [] 
         }));
@@ -604,18 +613,15 @@ const AppPOS = ({ onNavigateAdmin }) => {
         };
     };
 
-    // Hàm xử lý Thanh toán ngay lập tức
     const handleCheckout = (isPrint = false) => {
         if (cart.length === 0) return;
 
-        // Trừ tồn kho tự động theo định mức nguyên liệu
         const updatedIngredients = [...ingredients];
         cart.forEach(item => {
             if (item.type === 'retail') {
                 const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
                 if (idx !== -1) updatedIngredients[idx].stock -= item.quantity;
             } else if (item.recipe && item.recipe.length > 0) {
-                // Trừ cốt nguyên liệu
                 item.recipe.forEach(r => {
                     const idx = updatedIngredients.findIndex(ing => ing.id === r.ingId);
                     if (idx !== -1) {
@@ -626,7 +632,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         });
         setIngredients(updatedIngredients);
 
-        // Tạo hóa đơn mới
         const finalizedOrder = {
             id: `ORD${Date.now().toString().slice(-4)}`,
             token: orderCounter,
@@ -654,7 +659,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         const itemToDelete = history.find(h => h.id === id);
         if (!itemToDelete) return;
 
-        // Hoàn lại kho
         let updatedIngredients = [...ingredients];
         itemToDelete.items.forEach(item => {
             if (item.type === 'retail') {
@@ -702,7 +706,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
             sellPrice: parseFloat(fd.get('sellPrice')) || 0,
             category: fd.get('category'), 
             stock: parseFloat(fd.get('stock')) || 0,
-            isSellable: isIngSellable // Lấy từ state checkbox
+            isSellable: isIngSellable
         };
         if (editingIng) {
             setIngredients(ingredients.map(i => i.id === editingIng.id ? { ...i, ...ingData } : i));
@@ -715,7 +719,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     };
 
     // ==========================================
-    // LOGIC THÊM & SỬA MÓN BÁN (THỰC ĐƠN) CÓ RECIPE
+    // LOGIC THÊM & SỬA MÓN BÁN
     // ==========================================
     const [newProductForm, setNewProductForm] = useState({
         name: '', category: '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '', recipe: [] }]
@@ -760,7 +764,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }));
     };
 
-    // Quản lý định mức nguyên liệu (Recipe)
     const addRecipeItem = (variantIndex) => {
         if (ingredients.length === 0) {
             showNotification("Bạn cần thêm hàng hóa vào Kho trước!", "error");
@@ -780,7 +783,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
             newRecipe[recipeIndex] = { ...newRecipe[recipeIndex], [field]: field === 'amount' ? (parseFloat(value) || 0) : value };
             newVariants[variantIndex].recipe = newRecipe;
             
-            // Tính toán tự động giá vốn dựa trên công thức
             let autoCost = 0;
             newRecipe.forEach(r => {
                 const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
@@ -798,7 +800,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
             const newRecipe = newVariants[variantIndex].recipe.filter((_, i) => i !== recipeIndex);
             newVariants[variantIndex].recipe = newRecipe;
 
-            // Tính lại giá vốn sau khi xóa
             let autoCost = 0;
             newRecipe.forEach(r => {
                 const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
@@ -856,7 +857,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
     // ==========================================
     // LOGIC NHẬP HÀNG & KIỂM KHO
     // ==========================================
-    
     const addToImport = (ing) => {
         if (!importCart.find(i => i.id === ing.id)) {
             setImportCart([{ ...ing, importQty: '1', importPrice: String(ing.lastPrice || 0) }, ...importCart]);
@@ -1044,7 +1044,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 <div className="flex-1 flex overflow-hidden">
                     {activeTab === 'pos' && (
                         <>
-                            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 pb-24 md:pb-6">
+                            {/* Ở Mobile cần độn padding-bottom lớn hơn (pb-40) để chừa chỗ cho thanh Hóa đơn */}
+                            <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 pb-40 md:pb-6">
                                 <div className="md:hidden mb-4 relative">
                                     <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
                                     <input type="text" placeholder="Tìm món..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
@@ -1057,40 +1058,49 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     ))}
                                 </div>
 
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mt-2">
+                                {/* THAY ĐỔI: Grid linh hoạt. Mobile: danh sách dọc các hàng ngang. PC: Dạng lưới ô vuông */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mt-2">
                                     {posItems.length === 0 && <div className="col-span-full text-center py-10 text-slate-400 font-bold text-sm">Không tìm thấy mặt hàng nào để bán</div>}
                                     {posItems.map(item => (
-                                        <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100 active:scale-95 text-left relative overflow-hidden flex flex-col h-full">
-                                            {item.type === 'retail' && <span className="absolute top-2 right-2 bg-blue-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase shadow">Lẻ</span>}
-                                            <div className="aspect-square mb-2 bg-slate-50 rounded-xl flex items-center justify-center text-3xl">{item.image || '🍵'}</div>
-                                            <span className="font-black text-slate-800 text-[10px] md:text-xs uppercase flex-1">{item.name}</span>
-                                            <span className="text-emerald-600 font-black text-xs md:text-sm mt-1">{item.price.toLocaleString()}đ</span>
+                                        <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-3 md:p-4 rounded-xl md:rounded-2xl shadow-sm border border-slate-100 active:scale-[0.98] md:active:scale-95 text-left relative overflow-hidden flex flex-row md:flex-col items-center md:items-start h-full gap-3 md:gap-0 transition-transform">
+                                            {item.type === 'retail' && <span className="absolute top-2 left-2 md:left-auto md:right-2 bg-blue-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase shadow z-10">Lẻ</span>}
+                                            
+                                            <div className="w-12 h-12 md:w-full md:aspect-square md:mb-2 bg-slate-50 rounded-lg md:rounded-xl flex items-center justify-center text-2xl md:text-3xl shrink-0">{item.image || '🍵'}</div>
+                                            
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                <span className="font-black text-slate-800 text-[12px] md:text-xs uppercase truncate block w-full">{item.name}</span>
+                                                <span className="text-emerald-600 font-black text-xs md:text-sm mt-0.5 md:mt-1">{item.price.toLocaleString()}đ</span>
+                                            </div>
+
+                                            <div className="md:hidden w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                                                <Icon name="plus" size={16} />
+                                            </div>
                                         </button>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* THANH GIỎ HÀNG MOBILE */}
-                            {cart.length > 0 && (
-                                <div className="md:hidden fixed bottom-[84px] left-4 right-4 z-[45]">
-                                    <button onClick={() => setShowMobileCart(true)} className="w-full bg-emerald-600 text-white p-3 rounded-2xl shadow-[0_10px_25px_rgba(5,150,105,0.4)] flex items-center justify-between transition-transform active:scale-95">
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative bg-white/20 p-2 rounded-xl">
-                                                <Icon name="shopping-cart" size={24} />
-                                                <span className="absolute -top-2 -right-2 bg-rose-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-emerald-600">{cart.length}</span>
-                                            </div>
-                                            <div className="flex flex-col items-start">
-                                                <span className="font-black text-sm uppercase">Giỏ hàng</span>
-                                                <span className="text-[10px] font-medium opacity-90">Nhấn để chốt đơn</span>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-black text-lg">{subtotal.toLocaleString()}đ</span>
-                                            <Icon name="chevron-right" size={20} className="opacity-70" />
-                                        </div>
+                            {/* THANH GIỎ HÀNG MOBILE MỚI - LUÔN HIỂN THỊ */}
+                            <div className="md:hidden fixed bottom-[72px] left-0 right-0 bg-white border-t border-slate-200 z-[45] px-4 py-3 flex items-center justify-between shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+                                <button onClick={() => setShowMobileCart(true)} className="flex items-center gap-3 flex-1 text-left">
+                                    <div className="relative bg-emerald-50 p-2.5 rounded-xl text-emerald-600">
+                                        <Icon name="shopping-cart" size={20} />
+                                        {cart.length > 0 && <span className="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">{cart.length}</span>}
+                                    </div>
+                                    <div className="flex flex-col items-start min-w-0">
+                                        <span className="font-black text-[11px] uppercase text-slate-500">Hóa đơn</span>
+                                        <span className="text-emerald-600 font-black text-sm">{subtotal.toLocaleString()}đ</span>
+                                    </div>
+                                </button>
+                                <div className="flex gap-2 shrink-0">
+                                    <button onClick={() => handleCheckout(true)} disabled={cart.length === 0} className="w-11 h-11 bg-blue-50 text-blue-600 disabled:opacity-50 disabled:bg-slate-50 disabled:text-slate-400 rounded-xl flex items-center justify-center transition-colors">
+                                        <Icon name="printer" size={20} />
+                                    </button>
+                                    <button onClick={() => handleCheckout(false)} disabled={cart.length === 0} className="px-5 h-11 bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl font-black text-xs uppercase shadow-md active:scale-95 transition-all">
+                                        Thanh toán
                                     </button>
                                 </div>
-                            )}
+                            </div>
 
                             <div className="hidden md:flex w-80 lg:w-96 bg-white border-l border-slate-200 flex-col">
                                 <div className="p-4 border-b font-black text-[10px] uppercase text-slate-400 bg-slate-50">Đơn hàng #{orderCounter}</div>
@@ -1506,6 +1516,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 )}
             </nav>
 
+            {/* MODAL GIỎ HÀNG MOBILE ĐỂ CHỈNH SỬA SỐ LƯỢNG */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 bg-white z-[100] flex flex-col slide-up-anim">
                     <div className="p-4 bg-[#0F172A] text-white flex justify-between items-center shrink-0 pt-safe">
