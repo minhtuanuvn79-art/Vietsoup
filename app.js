@@ -214,7 +214,7 @@ const AppAdmin = ({ onNavigateBack }) => {
                             <div className="py-2">
                                 <p className="text-[10px] font-black uppercase text-slate-400 mb-3 ml-2">Quyền truy cập</p>
                                 <div className="grid grid-cols-2 gap-2 text-[11px] font-bold text-slate-600">
-                                    {['pos', 'preparing', 'inventory', 'menu', 'history'].map(perm => (
+                                    {['pos', 'inventory', 'menu', 'history'].map(perm => (
                                         <label key={perm} className="flex items-center gap-2 cursor-pointer bg-slate-50 p-3 rounded-xl">
                                             <input type="checkbox" name="perms" value={perm} defaultChecked className="w-4 h-4 accent-emerald-500" />
                                             <span className="capitalize">{perm}</span>
@@ -241,7 +241,7 @@ const AppAdmin = ({ onNavigateBack }) => {
                                 <option value="admin">Admin</option>
                             </select>
                             <div className="grid grid-cols-2 gap-2 text-[11px] font-bold py-2">
-                                {['pos', 'preparing', 'inventory', 'menu', 'history'].map(perm => (
+                                {['pos', 'inventory', 'menu', 'history'].map(perm => (
                                     <label key={perm} className="flex items-center gap-2 bg-slate-50 p-3 rounded-xl">
                                         <input 
                                             type="checkbox" 
@@ -285,7 +285,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
     // UI States
     const [cart, setCart] = useState([]);
-    const [orders, setOrders] = useState([]);
     const [customerName, setCustomerName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState('Tất cả');
@@ -306,7 +305,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     
     // Modal States
     const [showAddMenu, setShowAddMenu] = useState(false);
-    const [editingProduct, setEditingProduct] = useState(null); // <--- THÊM STATE ĐỂ SỬA MÓN
+    const [editingProduct, setEditingProduct] = useState(null);
     
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
@@ -378,7 +377,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         if (!isSyncingFromCloud.current && users.length === 0) {
             const defaultAdmin = {
                 id: 1, username: 'admin', name: 'Quản trị viên', role: 'admin',
-                permissions: ['pos','preparing','inventory','menu','history'], password: 'admin'
+                permissions: ['pos','inventory','menu','history'], password: 'admin'
             };
             setUsers([defaultAdmin]);
         }
@@ -481,9 +480,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     }, [filteredHistory]);
 
     const stats = useMemo(() => ({
-        waiting: orders.length,
         lowStock: ingredients.filter(i => i.stock < 5).length
-    }), [orders, ingredients]);
+    }), [ingredients]);
 
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -550,30 +548,84 @@ const AppPOS = ({ onNavigateAdmin }) => {
         ).filter(item => item.quantity > 0));
     };
 
-    const handleInstantOrder = () => {
-        if (cart.length === 0) return;
-        const newOrder = {
-            id: `ORD${Date.now().toString().slice(-4)}`,
-            token: orderCounter,
-            customer: customerName || 'Khách lẻ',
-            timestamp: new Date().toISOString(),
-            items: [...cart], // cart tự động mang theo costPrice từ posItems
-            total: subtotal,
-            seller: currentUser.name
+    // Hàm in Bill (Tạo iframe ẩn để in)
+    const printBill = (order) => {
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+        
+        const content = `
+            <html>
+            <head>
+                <title>Bill #${order.token}</title>
+                <style>
+                    body { font-family: monospace; font-size: 12px; color: #000; margin: 0; padding: 10px; width: 100%; max-width: 300px; }
+                    .header { font-size: 16px; font-weight: bold; text-align: center; margin-bottom: 5px; }
+                    .text-center { text-align: center; }
+                    .divider { border-top: 1px dashed #000; margin: 8px 0; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 4px 0; text-align: left; }
+                    .right { text-align: right; }
+                    .center { text-align: center; }
+                    .bold { font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <div class="header">SMART POS</div>
+                <div class="text-center" style="margin-bottom: 10px;">Hóa Đơn Bán Hàng</div>
+                <div>Mã đơn: #${order.token}</div>
+                <div>Khách: ${order.customer}</div>
+                <div>Ngày: ${new Date(order.timestamp).toLocaleString('vi-VN')}</div>
+                <div>Thu ngân: ${order.seller}</div>
+                <div class="divider"></div>
+                <table>
+                    <tr>
+                        <th>Món</th>
+                        <th class="center" style="width: 30px;">SL</th>
+                        <th class="right">TT</th>
+                    </tr>
+                    ${order.items.map(item => `
+                    <tr>
+                        <td>${item.name}</td>
+                        <td class="center">${item.quantity}</td>
+                        <td class="right">${(item.price * item.quantity).toLocaleString()}</td>
+                    </tr>`).join('')}
+                </table>
+                <div class="divider"></div>
+                <table>
+                    <tr class="bold" style="font-size: 14px;">
+                        <td>TỔNG CỘNG:</td>
+                        <td class="right">${order.total.toLocaleString()}đ</td>
+                    </tr>
+                </table>
+                <div class="divider"></div>
+                <div class="text-center">Cảm ơn & Hẹn gặp lại!</div>
+            </body>
+            </html>
+        `;
+        
+        iframe.contentWindow.document.open();
+        iframe.contentWindow.document.write(content);
+        iframe.contentWindow.document.close();
+        
+        iframe.onload = function() {
+            setTimeout(() => {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                }, 500);
+            }, 200);
         };
-        setOrders([...orders, newOrder]);
-        setCart([]);
-        setCustomerName('');
-        setOrderCounter(prev => (prev >= 99 ? 1 : prev + 1));
-        setShowMobileCart(false);
-        showNotification('Đơn hàng đã chuyển vào Hàng Đợi.', 'success');
     };
 
-    const handlePayment = (orderId) => {
-        const orderToPay = orders.find(o => o.id === orderId);
-        if (!orderToPay) return;
+    // Hàm xử lý Thanh toán ngay lập tức
+    const handleCheckout = (isPrint = false) => {
+        if (cart.length === 0) return;
+
+        // Trừ tồn kho
         const updatedIngredients = [...ingredients];
-        orderToPay.items.forEach(item => {
+        cart.forEach(item => {
             if (item.type === 'retail') {
                 const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
                 if (idx !== -1) updatedIngredients[idx].stock -= item.quantity;
@@ -585,20 +637,33 @@ const AppPOS = ({ onNavigateAdmin }) => {
             }
         });
         setIngredients(updatedIngredients);
-        const finalizedOrder = { 
-            ...orderToPay, 
+
+        // Tạo hóa đơn mới
+        const finalizedOrder = {
+            id: `ORD${Date.now().toString().slice(-4)}`,
+            token: orderCounter,
+            customer: customerName || 'Khách lẻ',
             timestamp: new Date().toISOString(),
             payTime: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+            items: [...cart], 
+            total: subtotal,
             seller: currentUser.name
         };
-        setHistory([finalizedOrder, ...history]);
-        setOrders(prev => prev.filter(o => o.id !== orderId));
-        showNotification(`Hoàn tất thanh toán đơn #${orderToPay.token}`, 'success');
-    };
 
-    const handleDeleteWaitingOrder = (orderId) => {
-        if (!confirm('Xác nhận xóa đơn hàng đợi này?')) return;
-        setOrders(prev => prev.filter(o => o.id !== orderId));
+        // Lưu vào lịch sử (Báo cáo)
+        setHistory([finalizedOrder, ...history]);
+        
+        // In bill nếu được yêu cầu
+        if (isPrint) {
+            printBill(finalizedOrder);
+        }
+
+        // Reset Giỏ hàng
+        setCart([]);
+        setCustomerName('');
+        setOrderCounter(prev => (prev >= 99 ? 1 : prev + 1));
+        setShowMobileCart(false);
+        showNotification(`Thanh toán thành công đơn #${finalizedOrder.token}`, 'success');
     };
 
     // --- SỬA VÀ XÓA HÓA ĐƠN BÁN HÀNG ---
@@ -915,7 +980,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
                 <nav className="flex-1 p-4 space-y-2">
                     {currentUser.permissions?.includes('pos') && <SidebarItem icon="layout-grid" label="Bán Hàng" active={activeTab === 'pos'} onClick={() => setActiveTab('pos')} />}
-                    {currentUser.permissions?.includes('preparing') && <SidebarItem icon="clipboard-list" label="Hàng Đợi" active={activeTab === 'preparing'} onClick={() => setActiveTab('preparing')} badge={stats.waiting} />}
                     {currentUser.permissions?.includes('inventory') && <SidebarItem icon="database" label="Kho Hàng" active={activeTab === 'inventory'} onClick={() => setActiveTab('inventory')} badge={stats.lowStock > 0 ? '!' : null} />}
                     {currentUser.permissions?.includes('menu') && <SidebarItem icon="settings" label="Thực Đơn" active={activeTab === 'menu'} onClick={() => setActiveTab('menu')} />}
                     {currentUser.permissions?.includes('history') && <SidebarItem icon="history" label="Báo Cáo" active={activeTab === 'history'} onClick={() => setActiveTab('history')} />}
@@ -1012,27 +1076,14 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                                 <div className="p-6 bg-slate-900 text-white rounded-t-3xl">
                                     <div className="flex justify-between items-center mb-4"><span className="text-slate-400 text-xs font-black uppercase">Thanh toán</span><span className="text-xl font-black text-emerald-400">{subtotal.toLocaleString()}đ</span></div>
-                                    <button onClick={handleInstantOrder} disabled={cart.length === 0} className="w-full py-4 bg-emerald-500 rounded-xl font-black text-sm uppercase">Xác nhận</button>
+                                    
+                                    <div className="flex gap-2">
+                                        <button onClick={() => handleCheckout(false)} disabled={cart.length === 0} className="flex-1 py-3 bg-emerald-500 disabled:bg-slate-700 rounded-xl font-black text-xs uppercase hover:bg-emerald-600 transition-colors shadow-lg">Thanh toán</button>
+                                        <button onClick={() => handleCheckout(true)} disabled={cart.length === 0} className="flex-1 py-3 bg-blue-500 disabled:bg-slate-700 rounded-xl font-black text-xs uppercase hover:bg-blue-600 transition-colors flex justify-center items-center gap-2 shadow-lg"><Icon name="printer" size={16}/> In Bill</button>
+                                    </div>
                                 </div>
                             </div>
                         </>
-                    )}
-
-                    {activeTab === 'preparing' && (
-                        <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            {orders.map(order => (
-                                <div key={order.id} className="bg-white rounded-2xl border border-slate-200 p-4 mb-4 shadow-sm">
-                                    <div className="flex justify-between mb-3 border-b pb-2">
-                                        <h4 className="font-black text-md uppercase">{order.customer} <span className="text-slate-400 text-xs">#{order.token}</span></h4>
-                                        <button onClick={() => handleDeleteWaitingOrder(order.id)} className="text-red-400"><Icon name="trash-2" size={18} /></button>
-                                    </div>
-                                    <div className="space-y-1 mb-3">
-                                        {order.items.map((item, idx) => <div key={idx} className="flex justify-between text-xs font-bold text-slate-700"><span>{item.quantity}x {item.name}</span><span>{(item.price * item.quantity).toLocaleString()}đ</span></div>)}
-                                    </div>
-                                    <button onClick={() => handlePayment(order.id)} className="w-full py-3 bg-emerald-500 text-white rounded-xl font-black text-xs uppercase">Hoàn tất ({order.total.toLocaleString()}đ)</button>
-                                </div>
-                            ))}
-                        </div>
                     )}
 
                     {activeTab === 'inventory' && (
@@ -1374,11 +1425,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     <Icon name="layout-grid" size={20} />
                     <span className="text-[9px] font-black uppercase mt-1">Bán hàng</span>
                 </button>
-                <button onClick={() => setActiveTab('preparing')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center relative ${activeTab === 'preparing' ? "text-emerald-400" : "text-slate-500"}`}>
-                    <Icon name="clipboard-list" size={20} />
-                    {stats.waiting > 0 && <span className="absolute top-1 right-0 bg-orange-500 w-3 h-3 rounded-full"></span>}
-                    <span className="text-[9px] font-black uppercase mt-1">Đợi ({stats.waiting})</span>
-                </button>
                 {currentUser.permissions?.includes('inventory') && (
                     <button onClick={() => setActiveTab('inventory')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'inventory' ? "text-emerald-400" : "text-slate-500"}`}>
                         <Icon name="database" size={20} />
@@ -1433,12 +1479,15 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         ))}
                     </div>
 
-                    <div className="p-6 bg-white border-t border-slate-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] shrink-0 pb-safe">
+                    <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-10px_20px_rgba(0,0,0,0.05)] shrink-0 pb-safe">
                         <div className="flex justify-between items-center mb-4">
                             <span className="text-slate-500 font-black uppercase text-xs">Tổng cộng</span>
                             <span className="text-2xl font-black text-emerald-600">{subtotal.toLocaleString()}đ</span>
                         </div>
-                        <button onClick={handleInstantOrder} disabled={cart.length === 0} className="w-full py-4 bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl font-black text-sm uppercase shadow-lg">Xác nhận đặt hàng</button>
+                        <div className="flex gap-2">
+                            <button onClick={() => handleCheckout(false)} disabled={cart.length === 0} className="w-full py-4 bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl font-black text-sm uppercase shadow-lg">Thanh toán</button>
+                            <button onClick={() => handleCheckout(true)} disabled={cart.length === 0} className="w-full py-4 bg-blue-500 disabled:bg-slate-300 text-white rounded-xl font-black text-sm uppercase shadow-lg flex items-center justify-center gap-2"><Icon name="printer" size={20}/> In Bill</button>
+                        </div>
                     </div>
                 </div>
             )}
