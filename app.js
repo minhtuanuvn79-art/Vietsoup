@@ -420,17 +420,18 @@ const AppPOS = ({ onNavigateAdmin }) => {
     };
 
     // Chuẩn bị dữ liệu POS hiển thị (Menu + Kho bán lẻ)
+    // Cập nhật: mang theo công thức (recipe) để trừ kho
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
                 return p.variants.map(v => ({
-                    ...p, id: `${p.id}-${v.size}`, variantId: v.size, name: `${p.name} (${v.size})`, price: v.price, costPrice: v.costPrice || 0, type: 'menu'
+                    ...p, id: `${p.id}-${v.size}`, variantId: v.size, name: `${p.name} (${v.size})`, price: v.price, costPrice: v.costPrice || 0, recipe: v.recipe || [], type: 'menu'
                 }));
             }
-            return [{ ...p, type: 'menu', costPrice: 0 }];
+            return [{ ...p, type: 'menu', costPrice: 0, recipe: [] }];
         });
         const retailItems = ingredients.filter(i => i.sellPrice > 0).map(i => ({ 
-            id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice, costPrice: i.lastPrice || 0, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail' 
+            id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice, costPrice: i.lastPrice || 0, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail', recipe: [] 
         }));
         
         return [...processedProducts, ...retailItems].filter(item => {
@@ -623,16 +624,19 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const handleCheckout = (isPrint = false) => {
         if (cart.length === 0) return;
 
-        // Trừ tồn kho
+        // Trừ tồn kho tự động theo định mức nguyên liệu (KiotViet style)
         const updatedIngredients = [...ingredients];
         cart.forEach(item => {
             if (item.type === 'retail') {
                 const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
                 if (idx !== -1) updatedIngredients[idx].stock -= item.quantity;
-            } else if (item.recipe) {
+            } else if (item.recipe && item.recipe.length > 0) {
+                // Trừ theo công thức
                 item.recipe.forEach(r => {
                     const idx = updatedIngredients.findIndex(ing => ing.id === r.ingId);
-                    if (idx !== -1) updatedIngredients[idx].stock -= (r.amount * item.quantity);
+                    if (idx !== -1) {
+                        updatedIngredients[idx].stock -= (r.amount * item.quantity);
+                    }
                 });
             }
         });
@@ -678,9 +682,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
             if (item.type === 'retail') {
                 const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
                 if (idx !== -1) updatedIngredients[idx].stock += item.quantity;
-            } else if (item.recipe) {
+            } else if (item.recipe && item.recipe.length > 0) {
                 item.recipe.forEach(r => {
-                    const idx = updatedIngredients.findIndex(ing => ing.id === r.ingId);
+                    const idx = updatedIngredients.findIndex(ing => Number(ing.id) === Number(r.ingId));
                     if (idx !== -1) updatedIngredients[idx].stock += (r.amount * item.quantity);
                 });
             }
@@ -730,15 +734,15 @@ const AppPOS = ({ onNavigateAdmin }) => {
     };
 
     // ==========================================
-    // LOGIC THÊM & SỬA MÓN BÁN (THỰC ĐƠN)
+    // LOGIC THÊM & SỬA MÓN BÁN (THỰC ĐƠN) CÓ RECIPE
     // ==========================================
     const [newProductForm, setNewProductForm] = useState({
-        name: '', category: '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '' }]
+        name: '', category: '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '', recipe: [] }]
     });
 
     const openAddProductModal = () => {
         setEditingProduct(null);
-        setNewProductForm({ name: '', category: categories[0] || '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '' }] });
+        setNewProductForm({ name: '', category: categories[0] || '', image: '🍵', variants: [{ size: 'Mặc định', costPrice: '', price: '', recipe: [] }] });
         setShowAddMenu(true);
     };
 
@@ -748,7 +752,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
             name: p.name,
             category: p.category,
             image: p.image || '🍵',
-            variants: p.variants ? p.variants.map(v => ({...v, costPrice: v.costPrice || ''})) : [{ size: 'Mặc định', costPrice: '', price: '' }]
+            variants: p.variants ? p.variants.map(v => ({...v, costPrice: v.costPrice || '', recipe: v.recipe || []})) : [{ size: 'Mặc định', costPrice: '', price: '', recipe: [] }]
         });
         setShowAddMenu(true);
     };
@@ -764,7 +768,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const addVariant = () => {
         setNewProductForm(prev => ({
             ...prev,
-            variants: [...prev.variants, { size: '', costPrice: '', price: '' }]
+            variants: [...prev.variants, { size: '', costPrice: '', price: '', recipe: [] }]
         }));
     };
 
@@ -775,6 +779,56 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }));
     };
 
+    // Quản lý định mức nguyên liệu (Recipe)
+    const addRecipeItem = (variantIndex) => {
+        if (ingredients.length === 0) {
+            showNotification("Bạn cần thêm hàng hóa vào Kho trước!", "error");
+            return;
+        }
+        setNewProductForm(prev => {
+            const newVariants = [...prev.variants];
+            newVariants[variantIndex].recipe = [...(newVariants[variantIndex].recipe || []), { ingId: ingredients[0].id, amount: 1 }];
+            return { ...prev, variants: newVariants };
+        });
+    };
+
+    const updateRecipeItem = (variantIndex, recipeIndex, field, value) => {
+        setNewProductForm(prev => {
+            const newVariants = [...prev.variants];
+            const newRecipe = [...newVariants[variantIndex].recipe];
+            newRecipe[recipeIndex] = { ...newRecipe[recipeIndex], [field]: field === 'amount' ? (parseFloat(value) || 0) : value };
+            newVariants[variantIndex].recipe = newRecipe;
+            
+            // Tính toán tự động giá vốn dựa trên công thức
+            let autoCost = 0;
+            newRecipe.forEach(r => {
+                const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                if (ing) autoCost += ((ing.lastPrice || 0) * r.amount);
+            });
+            newVariants[variantIndex].costPrice = autoCost;
+
+            return { ...prev, variants: newVariants };
+        });
+    };
+
+    const removeRecipeItem = (variantIndex, recipeIndex) => {
+        setNewProductForm(prev => {
+            const newVariants = [...prev.variants];
+            const newRecipe = newVariants[variantIndex].recipe.filter((_, i) => i !== recipeIndex);
+            newVariants[variantIndex].recipe = newRecipe;
+
+            // Tính lại giá vốn sau khi xóa
+            let autoCost = 0;
+            newRecipe.forEach(r => {
+                const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                if (ing) autoCost += ((ing.lastPrice || 0) * r.amount);
+            });
+            newVariants[variantIndex].costPrice = autoCost;
+
+            return { ...prev, variants: newVariants };
+        });
+    };
+
     const handleProductSubmit = (e) => {
         e.preventDefault();
         const validVariants = newProductForm.variants
@@ -782,7 +836,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
             .map(v => ({
                 ...v, 
                 price: parseFloat(v.price), 
-                costPrice: parseFloat(v.costPrice) || 0 
+                costPrice: parseFloat(v.costPrice) || 0,
+                recipe: v.recipe || []
             }));
 
         if (editingProduct) {
@@ -791,7 +846,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 name: newProductForm.name,
                 category: newProductForm.category,
                 image: newProductForm.image,
-                variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', costPrice: 0, price: 0}]
+                variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', costPrice: 0, price: 0, recipe: []}]
             };
             setProducts(products.map(p => p.id === editingProduct.id ? updatedP : p));
             showNotification("Đã cập nhật món thành công!", "success");
@@ -801,7 +856,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 name: newProductForm.name,
                 category: newProductForm.category,
                 image: newProductForm.image || '🍵',
-                variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', costPrice: 0, price: 0}]
+                variants: validVariants.length > 0 ? validVariants : [{size: 'Mặc định', costPrice: 0, price: 0, recipe: []}]
             };
             setProducts([...products, newP]);
             showNotification("Đã thêm món mới thành công!", "success");
@@ -1310,14 +1365,24 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     <div key={p.id} className="bg-white p-4 rounded-2xl border border-slate-200 relative shadow-sm flex flex-col">
                                         <p className="font-black text-sm uppercase mb-2 pr-6">{p.name}</p>
                                         <div><span className="text-[10px] px-2 py-1 bg-slate-100 rounded text-slate-500 font-bold uppercase">{p.category}</span></div>
-                                        <div className="mt-3 space-y-1 bg-slate-50 p-2 rounded-xl flex-1">
+                                        <div className="mt-3 space-y-2 bg-slate-50 p-2 rounded-xl flex-1">
                                             {p.variants?.map((v, i) => (
-                                                <div key={i} className="flex justify-between items-center text-xs font-bold text-emerald-600 border-b border-white last:border-0 pb-1 last:pb-0 mb-1 last:mb-0">
-                                                    <span className="text-slate-600">Size {v.size}</span>
-                                                    <div className="text-right">
-                                                        <span className="text-[9px] text-slate-400 mr-2">Vốn: {v.costPrice?.toLocaleString() || 0}đ</span>
-                                                        <span>Bán: {v.price.toLocaleString()}đ</span>
+                                                <div key={i} className="flex flex-col border-b border-white last:border-0 pb-2 last:pb-0 mb-1 last:mb-0">
+                                                    <div className="flex justify-between items-center text-xs font-bold text-emerald-600 mb-1">
+                                                        <span className="text-slate-600">Size {v.size}</span>
+                                                        <div className="text-right">
+                                                            <span className="text-[9px] text-slate-400 mr-2">Vốn: {v.costPrice?.toLocaleString() || 0}đ</span>
+                                                            <span>Bán: {v.price.toLocaleString()}đ</span>
+                                                        </div>
                                                     </div>
+                                                    {v.recipe && v.recipe.length > 0 && (
+                                                        <div className="text-[9px] text-slate-500 ml-2 border-l-2 border-slate-200 pl-2">
+                                                            {v.recipe.map((r, rIdx) => {
+                                                                const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                                                                return <div key={rIdx}>- Trừ {r.amount} {ing?.unit} {ing?.name}</div>
+                                                            })}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
@@ -1543,7 +1608,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN */}
+            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN KÈM RECIPE */}
             {showAddMenu && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <form onSubmit={handleProductSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -1574,28 +1639,68 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                                 
                                 {newProductForm.variants.map((v, idx) => (
-                                    <div key={idx} className="flex gap-2 mb-3 items-end">
-                                        <div className="w-1/4">
-                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Size</label>
-                                            <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="M..." className="w-full p-3 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá vốn</label>
-                                            <div className="relative">
-                                                <input value={v.costPrice} type="number" onChange={(e) => updateVariant(idx, 'costPrice', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" />
-                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
+                                    <div key={idx} className="mb-4 pb-4 border-b border-slate-200 last:border-0 last:pb-0 last:mb-0">
+                                        <div className="flex gap-2 mb-2 items-end">
+                                            <div className="w-1/4">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Size</label>
+                                                <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="M..." className="w-full p-3 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
                                             </div>
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá bán</label>
-                                            <div className="relative">
-                                                <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
-                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
+                                            <div className="flex-1">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá vốn</label>
+                                                <div className="relative">
+                                                    <input value={v.costPrice} type="number" onChange={(e) => updateVariant(idx, 'costPrice', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
+                                                </div>
                                             </div>
+                                            <div className="flex-1">
+                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá bán</label>
+                                                <div className="relative">
+                                                    <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
+                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
+                                                </div>
+                                            </div>
+                                            {newProductForm.variants.length > 1 && (
+                                                <button type="button" onClick={() => removeVariant(idx)} className="p-3 mb-0.5 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"><Icon name="trash-2" size={16}/></button>
+                                            )}
                                         </div>
-                                        {newProductForm.variants.length > 1 && (
-                                            <button type="button" onClick={() => removeVariant(idx)} className="p-3 mb-0.5 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"><Icon name="trash-2" size={16}/></button>
-                                        )}
+
+                                        {/* PHẦN ĐỊNH MỨC NGUYÊN LIỆU CHO TỪNG SIZE */}
+                                        <div className="bg-white p-3 rounded-xl border border-slate-100">
+                                            <div className="flex justify-between items-center mb-2">
+                                                <span className="text-[9px] font-black uppercase text-emerald-600"><Icon name="database" size={10} className="mr-1 inline"/> Định mức kho (Trừ nguyên liệu)</span>
+                                                <button type="button" onClick={() => addRecipeItem(idx)} className="text-[9px] bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-bold">+ Thêm NL</button>
+                                            </div>
+                                            
+                                            {v.recipe && v.recipe.length > 0 ? (
+                                                v.recipe.map((r, rIdx) => {
+                                                    const selectedIng = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                                                    return (
+                                                        <div key={rIdx} className="flex gap-2 items-center mb-2 last:mb-0">
+                                                            <select value={r.ingId} onChange={e => updateRecipeItem(idx, rIdx, 'ingId', e.target.value)} className="flex-1 p-2 text-xs font-bold border border-slate-200 bg-slate-50 rounded-lg outline-none">
+                                                                {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
+                                                            </select>
+                                                            <div className="w-24 relative">
+                                                                <input type="number" step="0.1" value={r.amount} onChange={e => updateRecipeItem(idx, rIdx, 'amount', e.target.value)} className="w-full p-2 pr-8 text-xs font-bold border border-slate-200 bg-slate-50 rounded-lg outline-none" placeholder="SL"/>
+                                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">{selectedIng?.unit || ''}</span>
+                                                            </div>
+                                                            <button type="button" onClick={() => removeRecipeItem(idx, rIdx)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg"><Icon name="x" size={14}/></button>
+                                                        </div>
+                                                    )
+                                                })
+                                            ) : (
+                                                <p className="text-[9px] text-slate-400 italic">Chưa cài đặt định mức kho cho size này.</p>
+                                            )}
+                                            
+                                            {/* HIỂN THỊ TỔNG GIÁ VỐN DỰ TÍNH */}
+                                            {v.recipe && v.recipe.length > 0 && (
+                                                <div className="text-[9px] font-black text-slate-500 mt-2 text-right border-t border-slate-50 pt-2">
+                                                    Vốn NL dự tính: <span className="text-orange-500 text-xs">{(v.recipe.reduce((sum, r) => {
+                                                        const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                                                        return sum + (ing ? (ing.lastPrice || 0) * r.amount : 0);
+                                                    }, 0)).toLocaleString()}đ</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                             </div>
