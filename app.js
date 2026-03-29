@@ -543,6 +543,19 @@ const AppPOS = ({ onNavigateAdmin }) => {
         ).filter(item => item.quantity > 0));
     };
 
+    const removeFromCart = (id) => {
+        setCart(prev => prev.filter(item => item.id !== id));
+        showNotification("Đã xóa món khỏi giỏ", "success");
+    };
+
+    const clearCart = () => {
+        if(confirm('Bạn có chắc muốn xóa toàn bộ giỏ hàng?')) {
+            setCart([]);
+            setCustomerName('');
+            showNotification("Đã làm mới giỏ hàng", "success");
+        }
+    };
+
     const printBill = (order) => {
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
@@ -1044,7 +1057,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 <div className="flex-1 flex overflow-hidden">
                     {activeTab === 'pos' && (
                         <>
-                            {/* Ở Mobile cần độn padding-bottom lớn hơn (pb-40) để chừa chỗ cho thanh Hóa đơn */}
                             <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 pb-40 md:pb-6">
                                 <div className="md:hidden mb-4 relative">
                                     <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1058,7 +1070,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     ))}
                                 </div>
 
-                                {/* THAY ĐỔI: Grid linh hoạt. Mobile: danh sách dọc các hàng ngang. PC: Dạng lưới ô vuông */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mt-2">
                                     {posItems.length === 0 && <div className="col-span-full text-center py-10 text-slate-400 font-bold text-sm">Không tìm thấy mặt hàng nào để bán</div>}
                                     {posItems.map(item => (
@@ -1080,7 +1091,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* THANH GIỎ HÀNG MOBILE MỚI - LUÔN HIỂN THỊ */}
+                            {/* THANH GIỎ HÀNG MOBILE LUÔN HIỂN THỊ */}
                             <div className="md:hidden fixed bottom-[72px] left-0 right-0 bg-white border-t border-slate-200 z-[45] px-4 py-3 flex items-center justify-between shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                                 <button onClick={() => setShowMobileCart(true)} className="flex items-center gap-3 flex-1 text-left">
                                     <div className="relative bg-emerald-50 p-2.5 rounded-xl text-emerald-600">
@@ -1103,7 +1114,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             </div>
 
                             <div className="hidden md:flex w-80 lg:w-96 bg-white border-l border-slate-200 flex-col">
-                                <div className="p-4 border-b font-black text-[10px] uppercase text-slate-400 bg-slate-50">Đơn hàng #{orderCounter}</div>
+                                <div className="p-4 border-b font-black text-[10px] uppercase text-slate-400 bg-slate-50 flex justify-between items-center">
+                                    <span>Đơn hàng #{orderCounter}</span>
+                                    {cart.length > 0 && <button onClick={clearCart} className="text-[10px] text-red-500 hover:text-red-700 bg-red-50 px-2 py-1 rounded font-bold transition-colors">XÓA HẾT</button>}
+                                </div>
                                 <div className="p-4 border-b"><input type="text" placeholder="Tên khách hàng..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-2 bg-slate-100 rounded-xl text-sm font-bold border-none" /></div>
                                 <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
                                     {cart.map(item => (
@@ -1116,6 +1130,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 <button onClick={() => updateQuantity(item.id, -1)} className="p-1"><Icon name="minus" size={14}/></button>
                                                 <span className="w-5 text-center text-xs font-black">{item.quantity}</span>
                                                 <button onClick={() => updateQuantity(item.id, 1)} className="p-1"><Icon name="plus" size={14}/></button>
+                                                <button onClick={() => removeFromCart(item.id)} className="p-1 text-red-500 hover:bg-red-50 rounded"><Icon name="trash-2" size={14}/></button>
                                             </div>
                                         </div>
                                     ))}
@@ -1485,42 +1500,46 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             </main>
 
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex items-center h-[72px] border-t border-white/5 z-40 pb-2 shadow-[0_-10px_20px_rgba(0,0,0,0.1)] overflow-x-auto no-scrollbar px-4 gap-6 justify-start">
-                <button onClick={() => setActiveTab('pos')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'pos' ? "text-emerald-400" : "text-slate-500"}`}>
+            {/* ĐÃ CHỈNH SỬA: CHIA ĐỀU BẰNG flex-1 VÀ justify-around */}
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2 shadow-[0_-10px_20px_rgba(0,0,0,0.1)] px-2">
+                <button onClick={() => setActiveTab('pos')} className={`flex-1 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'pos' ? "text-emerald-400" : "text-slate-500"}`}>
                     <Icon name="layout-grid" size={20} />
                     <span className="text-[9px] font-black uppercase mt-1">Bán hàng</span>
                 </button>
                 {currentUser.permissions?.includes('inventory') && (
-                    <button onClick={() => setActiveTab('inventory')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'inventory' ? "text-emerald-400" : "text-slate-500"}`}>
+                    <button onClick={() => setActiveTab('inventory')} className={`flex-1 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'inventory' ? "text-emerald-400" : "text-slate-500"}`}>
                         <Icon name="database" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Kho</span>
                     </button>
                 )}
                 {currentUser.permissions?.includes('menu') && (
-                    <button onClick={() => setActiveTab('menu')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'menu' ? "text-emerald-400" : "text-slate-500"}`}>
+                    <button onClick={() => setActiveTab('menu')} className={`flex-1 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'menu' ? "text-emerald-400" : "text-slate-500"}`}>
                         <Icon name="settings" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Thực đơn</span>
                     </button>
                 )}
                 {currentUser.permissions?.includes('history') && (
-                    <button onClick={() => setActiveTab('history')} className={`shrink-0 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'history' ? "text-emerald-400" : "text-slate-500"}`}>
+                    <button onClick={() => setActiveTab('history')} className={`flex-1 flex flex-col items-center gap-1 h-full justify-center ${activeTab === 'history' ? "text-emerald-400" : "text-slate-500"}`}>
                         <Icon name="history" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Báo cáo</span>
                     </button>
                 )}
                 {currentUser.role === 'admin' && (
-                    <button onClick={onNavigateAdmin} className="shrink-0 flex flex-col items-center gap-1 h-full justify-center text-slate-500">
+                    <button onClick={onNavigateAdmin} className="flex-1 flex flex-col items-center gap-1 h-full justify-center text-slate-500">
                         <Icon name="users" size={20} />
                         <span className="text-[9px] font-black uppercase mt-1">Admin</span>
                     </button>
                 )}
             </nav>
 
-            {/* MODAL GIỎ HÀNG MOBILE ĐỂ CHỈNH SỬA SỐ LƯỢNG */}
+            {/* MODAL GIỎ HÀNG MOBILE ĐỂ CHỈNH SỬA SỐ LƯỢNG VÀ XÓA */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 bg-white z-[100] flex flex-col slide-up-anim">
                     <div className="p-4 bg-[#0F172A] text-white flex justify-between items-center shrink-0 pt-safe">
-                        <h2 className="font-black text-sm uppercase">Giỏ hàng ({cart.length})</h2>
+                        <div className="flex items-center gap-3">
+                            <h2 className="font-black text-sm uppercase">Giỏ hàng ({cart.length})</h2>
+                            {cart.length > 0 && <button onClick={clearCart} className="text-[10px] bg-red-500/20 text-red-400 px-2 py-1 rounded font-bold uppercase transition-colors">Xóa hết</button>}
+                        </div>
                         <button onClick={() => setShowMobileCart(false)} className="p-2 bg-white/10 rounded-full"><Icon name="x" size={20}/></button>
                     </div>
                     
@@ -1531,15 +1550,16 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
                         {cart.length === 0 ? <p className="text-center text-slate-400 font-bold mt-10">Chưa có món nào</p> : 
                         cart.map(item => (
-                            <div key={item.id} className="flex gap-3 items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
+                            <div key={item.id} className="flex gap-2 items-center bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
                                 <div className="flex-1 min-w-0">
                                     <h4 className="text-xs font-black truncate uppercase">{item.name}</h4>
                                     <p className="text-xs text-emerald-600 font-bold">{item.price.toLocaleString()}đ</p>
                                 </div>
-                                <div className="flex items-center gap-2 bg-slate-50 rounded-lg p-1">
+                                <div className="flex items-center gap-1 bg-slate-50 rounded-lg p-1">
                                     <button onClick={() => updateQuantity(item.id, -1)} className="p-2 bg-white rounded shadow-sm"><Icon name="minus" size={16}/></button>
                                     <span className="w-6 text-center text-sm font-black">{item.quantity}</span>
                                     <button onClick={() => updateQuantity(item.id, 1)} className="p-2 bg-white rounded shadow-sm"><Icon name="plus" size={16}/></button>
+                                    <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-500 bg-red-50 rounded ml-1 shadow-sm"><Icon name="trash-2" size={16}/></button>
                                 </div>
                             </div>
                         ))}
