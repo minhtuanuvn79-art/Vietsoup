@@ -141,9 +141,6 @@ const AppAdmin = ({ onNavigateBack }) => {
                     <SidebarItem icon="users" label="Nhân viên" active={true} />
                     <SidebarItem icon="arrow-left" label="Quay lại POS" onClick={onNavigateBack} />
                 </nav>
-                <div className="p-6 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                    {isSyncing ? 'Syncing...' : 'Realtime Active'}
-                </div>
             </aside>
 
             <main className="flex-1 p-4 md:p-10 overflow-y-auto pb-24 md:pb-10">
@@ -188,17 +185,7 @@ const AppAdmin = ({ onNavigateBack }) => {
                 </div>
             </main>
 
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-[#0F172A] text-white flex justify-around items-center h-[72px] border-t border-white/5 z-40 pb-2">
-                <button className="text-emerald-400 flex flex-col items-center gap-1 w-full h-full justify-center">
-                    <Icon name="users" size={20} />
-                    <span className="text-[10px] font-black uppercase mt-1">Nhân viên</span>
-                </button>
-                <button onClick={onNavigateBack} className="text-slate-500 flex flex-col items-center gap-1 w-full h-full justify-center">
-                    <Icon name="arrow-left" size={20} />
-                    <span className="text-[10px] font-black uppercase mt-1">Quay lại</span>
-                </button>
-            </nav>
-
+            {/* Các Modal Admin (Thêm/Sửa NV) được giữ nguyên như cũ... */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <form onSubmit={addUser} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -228,7 +215,6 @@ const AppAdmin = ({ onNavigateBack }) => {
                     </form>
                 </div>
             )}
-
             {editingUser && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -309,6 +295,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     
     const [showIngModal, setShowIngModal] = useState(false);
     const [editingIng, setEditingIng] = useState(null);
+    const [isIngSellable, setIsIngSellable] = useState(false); // Trạng thái checkbox phân loại Hàng hóa
     
     const [editingHistoryItem, setEditingHistoryItem] = useState(null);
     const [showHistoryEditModal, setShowHistoryEditModal] = useState(false);
@@ -368,11 +355,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
             }
             isInitialLoad.current = false;
         });
-
         return () => rootRef.off();
     }, []);
 
-    // Khởi tạo Admin mặc định nếu chưa có
     useEffect(() => {
         if (!isSyncingFromCloud.current && users.length === 0) {
             const defaultAdmin = {
@@ -389,7 +374,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
     useEffect(() => {
         if (isSyncingFromCloud.current || isInitialLoad.current) return; 
-        
         const data = { ingredients, products, history, orderCounter, categories, stockTransactions };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         syncToCloud(data, users);
@@ -420,7 +404,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     };
 
     // Chuẩn bị dữ liệu POS hiển thị (Menu + Kho bán lẻ)
-    // Cập nhật: mang theo công thức (recipe) để trừ kho
+    // LỌC CHÍNH XÁC: Chỉ những hàng hóa nào tick "Bán trực tiếp" mới lọt vào tab Bán hàng
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
@@ -430,8 +414,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
             }
             return [{ ...p, type: 'menu', costPrice: 0, recipe: [] }];
         });
-        const retailItems = ingredients.filter(i => i.sellPrice > 0).map(i => ({ 
-            id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice, costPrice: i.lastPrice || 0, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail', recipe: [] 
+        
+        // Lọc Hàng hóa Kho có tick `isSellable` (hoặc dữ liệu cũ có giá bán lẻ > 0 để tương thích ngược)
+        const retailItems = ingredients.filter(i => i.isSellable === true || (i.isSellable === undefined && i.sellPrice > 0)).map(i => ({ 
+            id: `retail-${i.id}`, originalId: i.id, name: i.name, price: i.sellPrice || 0, costPrice: i.lastPrice || 0, category: i.category || 'Chưa phân loại', image: '📦', type: 'retail', recipe: [] 
         }));
         
         return [...processedProducts, ...retailItems].filter(item => {
@@ -467,7 +453,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         });
     }, [history, reportFilter, startDate, endDate, selectedSeller]);
 
-    // Báo cáo tính Lợi nhuận = Doanh thu - Giá vốn
     const reportStats = useMemo(() => {
         let totalRevenue = 0;
         let totalCost = 0;
@@ -549,7 +534,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         ).filter(item => item.quantity > 0));
     };
 
-    // Hàm in Bill (Tạo iframe ẩn để in)
     const printBill = (order) => {
         const iframe = document.createElement('iframe');
         iframe.style.display = 'none';
@@ -624,14 +608,14 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const handleCheckout = (isPrint = false) => {
         if (cart.length === 0) return;
 
-        // Trừ tồn kho tự động theo định mức nguyên liệu (KiotViet style)
+        // Trừ tồn kho tự động theo định mức nguyên liệu
         const updatedIngredients = [...ingredients];
         cart.forEach(item => {
             if (item.type === 'retail') {
                 const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
                 if (idx !== -1) updatedIngredients[idx].stock -= item.quantity;
             } else if (item.recipe && item.recipe.length > 0) {
-                // Trừ theo công thức
+                // Trừ cốt nguyên liệu
                 item.recipe.forEach(r => {
                     const idx = updatedIngredients.findIndex(ing => ing.id === r.ingId);
                     if (idx !== -1) {
@@ -654,15 +638,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
             seller: currentUser.name
         };
 
-        // Lưu vào lịch sử (Báo cáo)
         setHistory([finalizedOrder, ...history]);
         
-        // In bill nếu được yêu cầu
-        if (isPrint) {
-            printBill(finalizedOrder);
-        }
+        if (isPrint) printBill(finalizedOrder);
 
-        // Reset Giỏ hàng
         setCart([]);
         setCustomerName('');
         setOrderCounter(prev => (prev >= 99 ? 1 : prev + 1));
@@ -670,7 +649,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         showNotification(`Thanh toán thành công đơn #${finalizedOrder.token}`, 'success');
     };
 
-    // --- SỬA VÀ XÓA HÓA ĐƠN BÁN HÀNG ---
     const handleDeleteHistoryItem = (id) => {
         if (!confirm('Bạn có chắc muốn xóa hóa đơn này? Số lượng hàng hóa đã bán sẽ được hoàn lại vào kho.')) return;
         const itemToDelete = history.find(h => h.id === id);
@@ -718,10 +696,13 @@ const AppPOS = ({ onNavigateAdmin }) => {
         e.preventDefault();
         const fd = new FormData(e.target);
         const ingData = {
-            name: fd.get('name'), unit: fd.get('unit'),
+            name: fd.get('name'), 
+            unit: fd.get('unit'),
             lastPrice: parseFloat(fd.get('costPrice')) || 0,
             sellPrice: parseFloat(fd.get('sellPrice')) || 0,
-            category: fd.get('category'), stock: parseFloat(fd.get('stock')) || 0
+            category: fd.get('category'), 
+            stock: parseFloat(fd.get('stock')) || 0,
+            isSellable: isIngSellable // Lấy từ state checkbox
         };
         if (editingIng) {
             setIngredients(ingredients.map(i => i.id === editingIng.id ? { ...i, ...ingData } : i));
@@ -971,7 +952,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         showNotification('Cân bằng kho thành công!', 'success');
     };
 
-    // --- SỬA VÀ XÓA LỊCH SỬ KHO ---
     const handleDeleteStockTrans = (id) => {
         if (!confirm('Xóa phiếu này sẽ tự động hoàn tác lại số lượng tồn kho. Bạn có chắc chắn?')) return;
         const trans = stockTransactions.find(t => t.id === id);
@@ -1078,12 +1058,13 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
 
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mt-2">
+                                    {posItems.length === 0 && <div className="col-span-full text-center py-10 text-slate-400 font-bold text-sm">Không tìm thấy mặt hàng nào để bán</div>}
                                     {posItems.map(item => (
-                                        <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100 active:scale-95 text-left relative overflow-hidden">
-                                            {item.type === 'retail' && <span className="absolute top-2 right-2 bg-blue-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase">Lẻ</span>}
+                                        <button key={item.id} onClick={() => addToCart(item)} className="bg-white p-3 md:p-4 rounded-2xl shadow-sm border border-slate-100 active:scale-95 text-left relative overflow-hidden flex flex-col h-full">
+                                            {item.type === 'retail' && <span className="absolute top-2 right-2 bg-blue-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase shadow">Lẻ</span>}
                                             <div className="aspect-square mb-2 bg-slate-50 rounded-xl flex items-center justify-center text-3xl">{item.image || '🍵'}</div>
-                                            <span className="font-black text-slate-800 text-[10px] md:text-xs uppercase truncate block">{item.name}</span>
-                                            <span className="text-emerald-600 font-black text-xs md:text-sm">{item.price.toLocaleString()}đ</span>
+                                            <span className="font-black text-slate-800 text-[10px] md:text-xs uppercase flex-1">{item.name}</span>
+                                            <span className="text-emerald-600 font-black text-xs md:text-sm mt-1">{item.price.toLocaleString()}đ</span>
                                         </button>
                                     ))}
                                 </div>
@@ -1155,7 +1136,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             {inventoryTab === 'stock' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     <div className="flex gap-2 mb-4">
-                                        <button onClick={() => { setEditingIng(null); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa</button>
+                                        <button onClick={() => { setEditingIng(null); setIsIngSellable(false); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa</button>
                                         <div className="flex flex-1 max-w-[220px] gap-1">
                                             <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="w-full px-3 text-xs bg-slate-100 rounded-lg outline-none border-none font-bold" />
                                             <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-lg"><Icon name="plus" size={16} /></button>
@@ -1165,13 +1146,22 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                         {ingredients.map(ing => (
                                             <div key={ing.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
-                                                <div className="flex justify-between mb-2">
-                                                    <p className="font-black text-xs uppercase truncate pr-4">{ing.name}</p>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <p className="font-black text-xs uppercase truncate pr-4 leading-tight">{ing.name}</p>
                                                     <p className={`font-black whitespace-nowrap ${ing.stock < 5 ? 'text-red-600' : 'text-emerald-600'}`}>{ing.stock} {ing.unit}</p>
+                                                </div>
+                                                <div className="mb-2">
+                                                    <span className={`px-2 py-1 rounded text-[8px] font-black uppercase text-white ${ing.isSellable === true || (ing.isSellable === undefined && ing.sellPrice > 0) ? 'bg-blue-500' : 'bg-slate-400'}`}>
+                                                        {ing.isSellable === true || (ing.isSellable === undefined && ing.sellPrice > 0) ? 'Bán trực tiếp' : 'Nguyên liệu'}
+                                                    </span>
                                                 </div>
                                                 <p className="text-[10px] font-bold text-slate-400 mb-2">Giá vốn: {ing.lastPrice?.toLocaleString()}đ</p>
                                                 <div className="flex gap-2 mt-3 border-t border-slate-50 pt-3">
-                                                    <button onClick={() => { setEditingIng(ing); setShowIngModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
+                                                    <button onClick={() => { 
+                                                        setEditingIng(ing); 
+                                                        setIsIngSellable(ing.isSellable === true || (ing.isSellable === undefined && ing.sellPrice > 0)); 
+                                                        setShowIngModal(true); 
+                                                    }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
                                                     <button onClick={() => handleDeleteIngredient(ing.id)} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/> Xóa</button>
                                                 </div>
                                             </div>
@@ -1438,7 +1428,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 )}
                             </div>
 
-                            {/* BẢNG THỐNG KÊ TỔNG - KIOTVIET STYLE */}
+                            {/* BẢNG THỐNG KÊ TỔNG */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                                 <div className="bg-emerald-500 text-white p-5 rounded-2xl shadow-md">
                                     <p className="text-[10px] font-black uppercase opacity-80 mb-1">Tổng Doanh thu</p>
@@ -1561,7 +1551,24 @@ const AppPOS = ({ onNavigateAdmin }) => {
             {showIngModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <form onSubmit={handleIngSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                        <h3 className="text-xl font-black uppercase italic mb-6">{editingIng ? 'Sửa thông tin mặt hàng' : 'Tạo hàng hóa mới'}</h3>
+                        <h3 className="text-xl font-black uppercase italic mb-6">{editingIng ? 'Sửa thông tin hàng' : 'Tạo hàng hóa mới'}</h3>
+                        
+                        {/* KHU VỰC PHÂN LOẠI */}
+                        <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl mb-4">
+                            <input 
+                                type="checkbox" 
+                                name="isSellable" 
+                                id="isSellable" 
+                                checked={isIngSellable}
+                                onChange={(e) => setIsIngSellable(e.target.checked)}
+                                className="w-5 h-5 accent-blue-600 mt-0.5 cursor-pointer" 
+                            />
+                            <div>
+                                <label htmlFor="isSellable" className="text-xs font-black uppercase text-blue-900 block mb-1 cursor-pointer">Là hàng hóa bán trực tiếp</label>
+                                <p className="text-[10px] text-blue-700 font-medium">Tick chọn nếu đây là hàng để bán (hiện ở Thu ngân). Bỏ tick nếu chỉ là nguyên liệu pha chế (ẩn khỏi Thu ngân).</p>
+                            </div>
+                        </div>
+
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên mặt hàng</label>
@@ -1587,13 +1594,16 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Giá bán lẻ (Để 0 nếu chỉ dùng để chế biến)</label>
-                                <div className="relative">
-                                    <input name="sellPrice" type="number" defaultValue={editingIng?.sellPrice || 0} placeholder="0" className="w-full p-4 pr-10 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                            {/* Chỉ hiện Ô Giá Bán Lẻ nếu được Tick là Hàng bán trực tiếp */}
+                            {isIngSellable && (
+                                <div>
+                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Giá bán lẻ</label>
+                                    <div className="relative">
+                                        <input name="sellPrice" type="number" defaultValue={editingIng?.sellPrice || 0} placeholder="0" className="w-full p-4 pr-10 bg-white border border-blue-200 rounded-xl font-bold outline-none focus:border-blue-500 text-sm shadow-sm" />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Danh mục</label>
@@ -1602,7 +1612,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </select>
                             </div>
                         </div>
-                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu mặt hàng</button>
+                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu dữ liệu</button>
                         <button type="button" onClick={() => setShowIngModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
                     </form>
                 </div>
