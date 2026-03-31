@@ -284,6 +284,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [cart, setCart] = useState([]);
     const [customerName, setCustomerName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [inventorySearch, setInventorySearch] = useState(''); // NEW: Tìm kiếm kho
+    const [menuSearch, setMenuSearch] = useState(''); // NEW: Tìm kiếm thực đơn
     const [selectedCategory, setSelectedCategory] = useState('Tất cả');
     const [newCatInput, setNewCatInput] = useState('');
     const [notifications, setNotifications] = useState([]);
@@ -436,10 +438,21 @@ const AppPOS = ({ onNavigateAdmin }) => {
         });
     }, [products, ingredients, searchTerm, selectedCategory]);
 
-    // Chuẩn bị dữ liệu Thực Đơn (Chỉ show sản phẩm tạo trong Menu)
+    // Lọc Thực Đơn (Menu) kèm tìm kiếm
     const filteredProductsForMenu = useMemo(() => {
-        return products.filter(p => selectedCategory === 'Tất cả' || p.category === selectedCategory);
-    }, [products, selectedCategory]);
+        return products.filter(p => {
+            const matchesCat = selectedCategory === 'Tất cả' || p.category === selectedCategory;
+            const matchesSearch = p.name.toLowerCase().includes(menuSearch.toLowerCase());
+            return matchesCat && matchesSearch;
+        });
+    }, [products, selectedCategory, menuSearch]);
+
+    // Lọc Kho Hàng (Inventory) kèm tìm kiếm
+    const filteredIngredients = useMemo(() => {
+        return ingredients.filter(ing => 
+            ing.name.toLowerCase().includes(inventorySearch.toLowerCase())
+        );
+    }, [ingredients, inventorySearch]);
 
     const filteredHistory = useMemo(() => {
         const now = new Date();
@@ -1096,7 +1109,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* THANH GIỎ HÀNG MOBILE LUÔN HIỂN THỊ */}
                             <div className="md:hidden fixed bottom-[72px] left-0 right-0 bg-white border-t border-slate-200 z-[45] px-4 py-3 flex items-center justify-between shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                                 <button onClick={() => setShowMobileCart(true)} className="flex items-center gap-3 flex-1 text-left">
                                     <div className="relative bg-emerald-50 p-2.5 rounded-xl text-emerald-600">
@@ -1166,7 +1178,17 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             {inventoryTab === 'stock' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     <div className="flex flex-col md:flex-row gap-2 mb-4">
-                                        <button onClick={() => { setEditingIng(null); setIsIngSellable(false); setShowIngModal(true); }} className="flex-1 bg-slate-900 text-white py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa</button>
+                                        <div className="flex-1 relative">
+                                            <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Tìm tên hàng hóa trong kho..." 
+                                                value={inventorySearch} 
+                                                onChange={(e) => setInventorySearch(e.target.value)} 
+                                                className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-500" 
+                                            />
+                                        </div>
+                                        <button onClick={() => { setEditingIng(null); setIsIngSellable(false); setShowIngModal(true); }} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-black text-xs uppercase">Thêm hàng hóa</button>
                                         <div className="flex md:max-w-[300px] gap-1">
                                             <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="flex-1 px-3 text-xs bg-slate-100 rounded-lg outline-none border-none font-bold" />
                                             <button onClick={addCategory} className="bg-emerald-500 text-white px-3 rounded-lg"><Icon name="plus" size={16} /></button>
@@ -1174,7 +1196,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                        {ingredients.map(ing => (
+                                        {filteredIngredients.map(ing => (
                                             <div key={ing.id} className="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm relative overflow-hidden">
                                                 <div className="flex justify-between items-start mb-2">
                                                     <p className="font-black text-xs uppercase truncate pr-4 leading-tight">{ing.name}</p>
@@ -1200,7 +1222,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: NHẬP HÀNG */}
+                            {/* TAB: NHẬP HÀNG (Giữ nguyên) */}
                             {inventoryTab === 'import' && (
                                 <div className="flex flex-col h-full gap-4 relative">
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0 z-10">
@@ -1279,9 +1301,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: KIỂM KHO */}
+                            {/* TAB: KIỂM KHO (Giữ nguyên) */}
                             {inventoryTab === 'stocktake' && (
-                                <div className="flex flex-col h-full">
+                                <div className="flex-1 flex flex-col h-full">
                                     {stocktakeList.length === 0 ? (
                                         <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200">
                                             <Icon name="clipboard-check" size={48} className="text-slate-300 mb-4" />
@@ -1328,7 +1350,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: LỊCH SỬ KHO */}
+                            {/* TAB: LỊCH SỬ KHO (Giữ nguyên) */}
                             {inventoryTab === 'history' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     {stockTransactions.length === 0 ? (
@@ -1381,7 +1403,17 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
                             {/* THANH QUẢN LÝ DANH MỤC TRONG TAB THỰC ĐƠN */}
                             <div className="flex flex-col md:flex-row gap-2 mb-4">
-                                <button onClick={openAddProductModal} className="flex-1 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md">+ Thêm món mới</button>
+                                <div className="flex-1 relative">
+                                    <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Tìm tên món trong thực đơn..." 
+                                        value={menuSearch} 
+                                        onChange={(e) => setMenuSearch(e.target.value)} 
+                                        className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-emerald-500" 
+                                    />
+                                </div>
+                                <button onClick={openAddProductModal} className="md:w-48 bg-emerald-500 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md">+ Thêm món mới</button>
                                 <div className="flex md:max-w-[300px] gap-1">
                                     <input type="text" placeholder="Thêm danh mục..." value={newCatInput} onChange={(e) => setNewCatInput(e.target.value)} className="flex-1 px-3 text-xs bg-white border border-slate-200 rounded-lg outline-none font-bold shadow-sm" />
                                     <button onClick={addCategory} className="bg-blue-500 text-white px-3 rounded-lg shadow-sm"><Icon name="plus" size={16} /></button>
@@ -1389,7 +1421,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* THANH LỌC DANH MỤC - MỚI BỔ SUNG */}
                             <div className="flex gap-2 overflow-x-auto pb-4 mb-2 no-scrollbar border-b border-slate-200">
                                 <button onClick={() => setSelectedCategory('Tất cả')} className={`px-4 py-2 rounded-xl font-black text-xs whitespace-nowrap ${selectedCategory === 'Tất cả' ? 'bg-emerald-500 text-white shadow-md' : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'}`}>Tất cả</button>
                                 {categories.map(cat => (
@@ -1436,7 +1467,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'history' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            {/* KHU VỰC BỘ LỌC */}
+                            {/* KHU VỰC BỘ LỌC (Giữ nguyên) */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
                                 <div className="flex flex-col md:flex-row gap-3">
                                     <div className="flex-1">
@@ -1460,8 +1491,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                         </select>
                                     </div>
                                 </div>
-                                
-                                {/* Tùy chọn Ngày cụ thể */}
                                 {reportFilter === 'custom' && (
                                     <div className="flex gap-3 mt-3 pt-3 border-t border-slate-100">
                                         <div className="flex-1">
@@ -1476,7 +1505,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 )}
                             </div>
 
-                            {/* BẢNG THỐNG KÊ TỔNG */}
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
                                 <div className="bg-emerald-500 text-white p-5 rounded-2xl shadow-md">
                                     <p className="text-[10px] font-black uppercase opacity-80 mb-1">Tổng Doanh thu</p>
@@ -1492,7 +1520,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* DANH SÁCH LỊCH SỬ ĐƠN */}
                             <div className="space-y-3">
                                 {filteredHistory.length === 0 ? (
                                     <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-sm">
@@ -1554,7 +1581,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 )}
             </nav>
 
-            {/* MODAL GIỎ HÀNG MOBILE ĐỂ CHỈNH SỬA SỐ LƯỢNG VÀ XÓA */}
+            {/* MODAL GIỎ HÀNG MOBILE */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 bg-white z-[100] flex flex-col slide-up-anim">
                     <div className="p-4 bg-[#0F172A] text-white flex justify-between items-center shrink-0 pt-safe">
@@ -1605,8 +1632,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <form onSubmit={handleIngSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
                         <h3 className="text-xl font-black uppercase italic mb-6">{editingIng ? 'Sửa thông tin hàng' : 'Tạo hàng hóa mới'}</h3>
-                        
-                        {/* KHU VỰC PHÂN LOẠI */}
                         <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl mb-4">
                             <input 
                                 type="checkbox" 
@@ -1621,13 +1646,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 <p className="text-[10px] text-blue-700 font-medium">Tick chọn nếu đây là hàng để bán (hiện ở Thu ngân). Bỏ tick nếu chỉ là nguyên liệu pha chế (ẩn khỏi Thu ngân).</p>
                             </div>
                         </div>
-
                         <div className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên mặt hàng</label>
                                 <input name="name" defaultValue={editingIng?.name} placeholder="vd: Cà phê hạt" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
                             </div>
-                            
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Đơn vị tính</label>
@@ -1638,7 +1661,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     <input name="stock" type="number" step="0.1" defaultValue={editingIng?.stock || 0} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
                                 </div>
                             </div>
-
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Giá vốn (Giá nhập/đơn vị)</label>
                                 <div className="relative">
@@ -1646,8 +1668,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
                                 </div>
                             </div>
-
-                            {/* Chỉ hiện Ô Giá Bán Lẻ nếu được Tick là Hàng bán trực tiếp */}
                             {isIngSellable && (
                                 <div>
                                     <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Giá bán lẻ</label>
@@ -1657,7 +1677,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     </div>
                                 </div>
                             )}
-
                             <div>
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Danh mục</label>
                                 <select name="category" defaultValue={editingIng?.category || categories[0]} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm">
@@ -1671,7 +1690,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN KÈM RECIPE */}
+            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN */}
             {showAddMenu && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <form onSubmit={handleProductSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
@@ -1681,7 +1700,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên Món</label>
                                 <input value={newProductForm.name} onChange={e => setNewProductForm({...newProductForm, name: e.target.value})} placeholder="vd: Trà sữa trân châu" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
                             </div>
-                            
                             <div className="flex gap-3">
                                 <div className="flex-1">
                                     <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Danh mục</label>
@@ -1694,13 +1712,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     <input value={newProductForm.image} onChange={e => setNewProductForm({...newProductForm, image: e.target.value})} placeholder="🍵" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-center text-xl" />
                                 </div>
                             </div>
-                            
                             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                 <div className="flex justify-between items-center mb-3">
                                     <p className="text-[10px] font-black uppercase text-slate-400">Các Biến thể (Size / Giá)</p>
                                     <button type="button" onClick={addVariant} className="text-[10px] font-bold text-blue-600 bg-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors">+ Thêm Size</button>
                                 </div>
-                                
                                 {newProductForm.variants.map((v, idx) => (
                                     <div key={idx} className="mb-4 pb-4 border-b border-slate-200 last:border-0 last:pb-0 last:mb-0">
                                         <div className="flex gap-2 mb-2 items-end">
@@ -1726,14 +1742,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 <button type="button" onClick={() => removeVariant(idx)} className="p-3 mb-0.5 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"><Icon name="trash-2" size={16}/></button>
                                             )}
                                         </div>
-
-                                        {/* PHẦN ĐỊNH MỨC NGUYÊN LIỆU CHO TỪNG SIZE */}
                                         <div className="bg-white p-3 rounded-xl border border-slate-100">
                                             <div className="flex justify-between items-center mb-2">
-                                                <span className="text-[9px] font-black uppercase text-emerald-600"><Icon name="database" size={10} className="mr-1 inline"/> Định mức kho (Trừ nguyên liệu)</span>
+                                                <span className="text-[9px] font-black uppercase text-emerald-600"><Icon name="database" size={10} className="mr-1 inline"/> Định mức kho</span>
                                                 <button type="button" onClick={() => addRecipeItem(idx)} className="text-[9px] bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-bold">+ Thêm NL</button>
                                             </div>
-                                            
                                             {v.recipe && v.recipe.length > 0 ? (
                                                 v.recipe.map((r, rIdx) => {
                                                     const selectedIng = ingredients.find(i => Number(i.id) === Number(r.ingId));
@@ -1753,8 +1766,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             ) : (
                                                 <p className="text-[9px] text-slate-400 italic">Chưa cài đặt định mức kho cho size này.</p>
                                             )}
-                                            
-                                            {/* HIỂN THỊ TỔNG GIÁ VỐN DỰ TÍNH */}
                                             {v.recipe && v.recipe.length > 0 && (
                                                 <div className="text-[9px] font-black text-slate-500 mt-2 text-right border-t border-slate-50 pt-2">
                                                     Vốn NL dự tính: <span className="text-orange-500 text-xs">{(v.recipe.reduce((sum, r) => {
@@ -1792,7 +1803,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
                             <div className="bg-orange-50 p-3 rounded-xl">
-                                <p className="text-[10px] font-bold text-orange-600 leading-relaxed"><Icon name="alert-circle" size={12} className="inline mr-1" />Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng XÓA hóa đơn (để hệ thống tự hoàn lại kho) và tạo đơn mới.</p>
+                                <p className="text-[10px] font-bold text-orange-600 leading-relaxed"><Icon name="alert-circle" size={12} className="inline mr-1" />Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng XÓA hóa đơn và tạo đơn mới.</p>
                             </div>
                         </div>
                         <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Cập nhật hóa đơn</button>
@@ -1826,7 +1837,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
                         <h3 className="text-xl font-black uppercase italic mb-6">Quản lý danh mục</h3>
-                        
                         <div className="space-y-3 mb-6">
                             {categories.map(cat => (
                                 <div key={cat} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
