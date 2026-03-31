@@ -296,6 +296,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
     const [stocktakeList, setStocktakeList] = useState([]);
+    const [historySubTab, setHistorySubTab] = useState('import'); // Chuyển đổi giữa Nhập hàng / Kiểm kho
+    const [expandedTransId, setExpandedTransId] = useState(null); // Quản lý việc xổ xuống chi tiết phiếu
     
     // Report Filter States
     const [reportFilter, setReportFilter] = useState('today');
@@ -1490,50 +1492,163 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: LỊCH SỬ KHO */}
+{/* TAB: LỊCH SỬ KHO (CHIA 2 MỤC: NHẬP HÀNG & KIỂM KHO) */}
                             {inventoryTab === 'history' && (
-                                <div className="flex-1 overflow-y-auto custom-scrollbar">
-                                    {stockTransactions.length === 0 ? (
-                                        <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-sm">Chưa có giao dịch kho nào.</div>
-                                    ) : (
-                                        stockTransactions.map(trans => (
-                                            <div key={trans.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm mb-3">
-                                                <div className="flex justify-between items-center mb-3 border-b border-slate-50 pb-2">
-                                                    <div>
-                                                        <span className={`px-2 py-1 rounded text-[10px] font-black uppercase text-white mr-2 ${trans.type === 'import' ? 'bg-blue-500' : 'bg-orange-500'}`}>
-                                                            {trans.type === 'import' ? 'Nhập hàng' : 'Kiểm kho'}
-                                                        </span>
-                                                        <span className="text-xs font-bold text-slate-400">#{trans.id}</span>
-                                                    </div>
-                                                    {trans.type === 'import' && <span className="font-black text-blue-600">{trans.total?.toLocaleString()}đ</span>}
-                                                </div>
-                                                <div className="space-y-1 mb-3 bg-slate-50 p-3 rounded-xl">
-                                                    {trans.items.map((i, idx) => (
-                                                        <div key={idx} className="flex justify-between text-[11px] font-bold text-slate-600">
-                                                            <span>{i.name}</span>
-                                                            {trans.type === 'import' ? (
-                                                                <span>+{i.qty} <span className="text-slate-400">({i.price.toLocaleString()}đ/đv)</span></span>
-                                                            ) : (
-                                                                <span className={i.diff > 0 ? 'text-blue-500' : 'text-red-500'}>
-                                                                    Cũ: {i.oldStock} ➔ Mới: {i.newStock} ({i.diff > 0 ? '+' : ''}{i.diff})
-                                                                </span>
-                                                            )}
+                                <div className="flex-1 flex flex-col h-full overflow-hidden bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                    
+                                    {/* SUB-TABS TRONG LỊCH SỬ */}
+                                    <div className="flex gap-6 border-b border-slate-100 px-6 pt-3 bg-slate-50 shrink-0">
+                                        <button 
+                                            onClick={() => setHistorySubTab('import')}
+                                            className={`pb-3 font-black text-[11px] uppercase border-b-2 transition-all tracking-wider ${historySubTab === 'import' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            Phiếu nhập hàng
+                                        </button>
+                                        <button 
+                                            onClick={() => setHistorySubTab('stocktake')}
+                                            className={`pb-3 font-black text-[11px] uppercase border-b-2 transition-all tracking-wider ${historySubTab === 'stocktake' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            Phiếu kiểm kho
+                                        </button>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 p-4">
+                                        {/* 1. MỤC LỊCH SỬ NHẬP HÀNG */}
+                                        {historySubTab === 'import' && (
+                                            <div className="space-y-3">
+                                                {stockTransactions.filter(t => t.type === 'import').length === 0 ? (
+                                                    <div className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch nhập hàng nào.</div>
+                                                ) : (
+                                                    stockTransactions.filter(t => t.type === 'import').map(trans => (
+                                                        <div key={trans.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                                                            <div className="flex justify-between items-center mb-3 border-b border-slate-50 pb-2">
+                                                                <div>
+                                                                    <span className="px-2 py-1 rounded text-[10px] font-black uppercase text-white bg-blue-500 mr-2">Nhập hàng</span>
+                                                                    <span className="text-xs font-bold text-slate-400">#{trans.id}</span>
+                                                                </div>
+                                                                <span className="font-black text-blue-600">{trans.total?.toLocaleString()}đ</span>
+                                                            </div>
+                                                            <div className="space-y-1 mb-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                                                {trans.items.map((i, idx) => (
+                                                                    <div key={idx} className="flex justify-between text-xs font-medium text-slate-600">
+                                                                        <span>{i.name}</span>
+                                                                        <span className="font-bold text-blue-600">+{i.qty} <span className="text-slate-400 text-[10px] font-normal">({i.price.toLocaleString()}đ/đv)</span></span>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-b border-slate-50 pb-3 mb-3">
+                                                                <span>{new Date(trans.timestamp).toLocaleString('vi-VN')}</span>
+                                                                <span className="uppercase bg-slate-100 px-2 py-0.5 rounded"><Icon name="user" size={10} className="mr-1 inline" />{trans.seller}</span>
+                                                            </div>
+                                                            <div className="flex gap-2">
+                                                                <button onClick={() => { setEditingStockTrans(trans); setShowStockTransEditModal(true); }} className="px-4 py-2 bg-slate-100 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] uppercase font-black transition-colors"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa giá trị</button>
+                                                                <button onClick={() => handleDeleteStockTrans(trans.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa phiếu (Hoàn tác)</button>
+                                                            </div>
                                                         </div>
-                                                    ))}
-                                                </div>
-                                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-b border-slate-50 pb-3 mb-3">
-                                                    <span>{new Date(trans.timestamp).toLocaleString('vi-VN')}</span>
-                                                    <span className="uppercase"><Icon name="user" size={10} className="mr-1 inline" />{trans.seller}</span>
-                                                </div>
-                                                <div className="flex gap-2">
-                                                    {trans.type === 'import' && (
-                                                        <button onClick={() => { setEditingStockTrans(trans); setShowStockTransEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa tổng tiền</button>
-                                                    )}
-                                                    <button onClick={() => handleDeleteStockTrans(trans.id)} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa phiếu</button>
-                                                </div>
+                                                    ))
+                                                )}
                                             </div>
-                                        ))
-                                    )}
+                                        )}
+
+                                        {/* 2. MỤC LỊCH SỬ KIỂM KHO (KIOTVIET STYLE: BẢNG & XỔ XUỐNG) */}
+                                        {historySubTab === 'stocktake' && (
+                                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                                    <thead className="bg-slate-100">
+                                                        <tr>
+                                                            <th className="w-10 p-3 border-b border-slate-200"></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Mã kiểm kho</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Thời gian</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Tổng thực tế</th>
+                                                            <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Tổng chênh lệch</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stockTransactions.filter(t => t.type === 'stocktake').length === 0 ? (
+                                                            <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch kiểm kho nào.</td></tr>
+                                                        ) : (
+                                                            stockTransactions.filter(t => t.type === 'stocktake').map(trans => {
+                                                                const isExpanded = expandedTransId === trans.id;
+                                                                const sumActual = trans.items.reduce((s, i) => s + i.newStock, 0);
+                                                                const sumDiff = trans.items.reduce((s, i) => s + i.diff, 0);
+                                                                
+                                                                return (
+                                                                    <React.Fragment key={trans.id}>
+                                                                        {/* DÒNG TIÊU ĐỀ PHIẾU */}
+                                                                        <tr 
+                                                                            onClick={() => setExpandedTransId(isExpanded ? null : trans.id)}
+                                                                            className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-emerald-50/50' : ''}`}
+                                                                        >
+                                                                            <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
+                                                                            <td className="p-3 text-xs font-bold text-emerald-600">{trans.id}</td>
+                                                                            <td className="p-3 text-xs text-slate-600 font-medium">{new Date(trans.timestamp).toLocaleString('vi-VN')}</td>
+                                                                            <td className="p-3 text-xs font-bold text-slate-800 text-right">{sumActual}</td>
+                                                                            <td className={`p-3 pr-6 text-xs font-black text-right ${sumDiff > 0 ? 'text-blue-600' : sumDiff < 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                                                                {sumDiff > 0 ? '+' : ''}{sumDiff}
+                                                                            </td>
+                                                                        </tr>
+
+                                                                        {/* DÒNG XỔ XUỐNG - CHI TIẾT PHIẾU */}
+                                                                        {isExpanded && (
+                                                                            <tr>
+                                                                                <td colSpan="5" className="p-0 border-b-2 border-emerald-500">
+                                                                                    <div className="bg-slate-50 p-5 shadow-inner border-t border-emerald-100 relative">
+                                                                                        
+                                                                                        {/* Thông tin Header của Phiếu */}
+                                                                                        <div className="mb-4 flex justify-between items-start">
+                                                                                            <div>
+                                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                                    <span className="font-black text-sm text-slate-800">{trans.id}</span>
+                                                                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Đã cân bằng kho</span>
+                                                                                                </div>
+                                                                                                <div className="text-[11px] text-slate-500 flex gap-4">
+                                                                                                    <p>Người tạo: <span className="font-bold text-slate-700">{trans.seller}</span></p>
+                                                                                                    <p>Ngày cân bằng: <span className="font-bold text-slate-700">{new Date(trans.timestamp).toLocaleDateString('vi-VN')}</span></p>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <button onClick={() => handleDeleteStockTrans(trans.id)} className="px-3 py-1.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                <Icon name="trash-2" size={14}/> Xóa (Hoàn tác phiếu)
+                                                                                            </button>
+                                                                                        </div>
+
+                                                                                        {/* Bảng chi tiết mặt hàng kiểm */}
+                                                                                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                                                                            <table className="w-full text-left border-collapse">
+                                                                                                <thead className="bg-slate-100 border-b border-slate-200">
+                                                                                                    <tr>
+                                                                                                        <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
+                                                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Tồn kho cũ</th>
+                                                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Thực tế</th>
+                                                                                                        <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-24">SL Lệch</th>
+                                                                                                    </tr>
+                                                                                                </thead>
+                                                                                                <tbody className="divide-y divide-slate-50">
+                                                                                                    {trans.items.map((item, idx) => (
+                                                                                                        <tr key={idx} className="hover:bg-slate-50">
+                                                                                                            <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
+                                                                                                            <td className="p-2.5 text-xs text-slate-500 text-center">{item.oldStock}</td>
+                                                                                                            <td className="p-2.5 text-xs font-bold text-slate-800 text-center bg-slate-50/50">{item.newStock}</td>
+                                                                                                            <td className={`p-2.5 pr-4 text-xs font-black text-right ${item.diff > 0 ? 'text-blue-500' : item.diff < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                                                                                                {item.diff > 0 ? '+' : ''}{item.diff}
+                                                                                                            </td>
+                                                                                                        </tr>
+                                                                                                    ))}
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </React.Fragment>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
