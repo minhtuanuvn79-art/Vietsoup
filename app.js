@@ -284,8 +284,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [cart, setCart] = useState([]);
     const [customerName, setCustomerName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const [inventorySearch, setInventorySearch] = useState(''); // NEW: Tìm kiếm kho
-    const [menuSearch, setMenuSearch] = useState(''); // NEW: Tìm kiếm thực đơn
+    const [inventorySearch, setInventorySearch] = useState(''); // Tìm kiếm kho
+    const [menuSearch, setMenuSearch] = useState(''); // Tìm kiếm thực đơn
     const [selectedCategory, setSelectedCategory] = useState('Tất cả');
     const [newCatInput, setNewCatInput] = useState('');
     const [notifications, setNotifications] = useState([]);
@@ -415,8 +415,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setCurrentUser(null);
         localStorage.removeItem(CURRENT_USER_KEY);
     };
-
-    // Chuẩn bị dữ liệu POS (Bán hàng)
+// Chuẩn bị dữ liệu POS (Bán hàng)
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
@@ -1222,7 +1221,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: NHẬP HÀNG (Giữ nguyên) */}
+                            {/* TAB: NHẬP HÀNG */}
                             {inventoryTab === 'import' && (
                                 <div className="flex flex-col h-full gap-4 relative">
                                     <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0 z-10">
@@ -1301,7 +1300,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: KIỂM KHO (Giữ nguyên) */}
+                            {/* TAB: KIỂM KHO */}
                             {inventoryTab === 'stocktake' && (
                                 <div className="flex-1 flex flex-col h-full">
                                     {stocktakeList.length === 0 ? (
@@ -1350,7 +1349,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: LỊCH SỬ KHO (Giữ nguyên) */}
+                            {/* TAB: LỊCH SỬ KHO */}
                             {inventoryTab === 'history' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     {stockTransactions.length === 0 ? (
@@ -1401,7 +1400,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'menu' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            {/* THANH QUẢN LÝ DANH MỤC TRONG TAB THỰC ĐƠN */}
                             <div className="flex flex-col md:flex-row gap-2 mb-4">
                                 <div className="flex-1 relative">
                                     <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -1467,7 +1465,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                     {activeTab === 'history' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            {/* KHU VỰC BỘ LỌC (Giữ nguyên) */}
                             <div className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
                                 <div className="flex flex-col md:flex-row gap-3">
                                     <div className="flex-1">
@@ -1580,8 +1577,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     </button>
                 )}
             </nav>
-
-            {/* MODAL GIỎ HÀNG MOBILE */}
+{/* MODAL GIỎ HÀNG MOBILE ĐỂ CHỈNH SỬA SỐ LƯỢNG VÀ XÓA */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 bg-white z-[100] flex flex-col slide-up-anim">
                     <div className="p-4 bg-[#0F172A] text-white flex justify-between items-center shrink-0 pt-safe">
@@ -1593,7 +1589,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     </div>
                     
                     <div className="p-4 border-b bg-slate-50 shrink-0">
-                        <input type="text" placeholder="Tên khách (Không bắt buộc)..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold" />
+                        <input type="text" placeholder="Tên khách (Không bắt buộc)..." value={customerName} onChange={(e) => setCustomerName(e.target.value)} className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-emerald-500" />
                     </div>
 
                     <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -1627,243 +1623,341 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL THÔNG TIN HÀNG HÓA KHO */}
+            {/* MODAL THÔNG TIN HÀNG HÓA KHO (KIOTVIET STYLE) */}
             {showIngModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <form onSubmit={handleIngSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                        <h3 className="text-xl font-black uppercase italic mb-6">{editingIng ? 'Sửa thông tin hàng' : 'Tạo hàng hóa mới'}</h3>
-                        <div className="flex items-start gap-3 p-4 bg-blue-50 border border-blue-100 rounded-xl mb-4">
-                            <input 
-                                type="checkbox" 
-                                name="isSellable" 
-                                id="isSellable" 
-                                checked={isIngSellable}
-                                onChange={(e) => setIsIngSellable(e.target.checked)}
-                                className="w-5 h-5 accent-blue-600 mt-0.5 cursor-pointer" 
-                            />
-                            <div>
-                                <label htmlFor="isSellable" className="text-xs font-black uppercase text-blue-900 block mb-1 cursor-pointer">Là hàng hóa bán trực tiếp</label>
-                                <p className="text-[10px] text-blue-700 font-medium">Tick chọn nếu đây là hàng để bán (hiện ở Thu ngân). Bỏ tick nếu chỉ là nguyên liệu pha chế (ẩn khỏi Thu ngân).</p>
-                            </div>
+                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-sm">
+                    <form onSubmit={handleIngSubmit} className="bg-white rounded-xl w-full max-w-4xl flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden shadow-2xl">
+                        
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                            <h3 className="text-lg font-bold text-slate-800">{editingIng ? 'Sửa hàng hóa' : 'Thêm hàng hóa mới'}</h3>
+                            <button type="button" onClick={() => setShowIngModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
                         </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên mặt hàng</label>
-                                <input name="name" defaultValue={editingIng?.name} placeholder="vd: Cà phê hạt" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Đơn vị tính</label>
-                                    <input name="unit" defaultValue={editingIng?.unit} placeholder="Kg, Lít, Ly..." className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tồn kho ban đầu</label>
-                                    <input name="stock" type="number" step="0.1" defaultValue={editingIng?.stock || 0} placeholder="0" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Giá vốn (Giá nhập/đơn vị)</label>
-                                <div className="relative">
-                                    <input name="costPrice" type="number" defaultValue={editingIng?.lastPrice || 0} placeholder="0" className="w-full p-4 pr-10 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
-                                </div>
-                            </div>
-                            {isIngSellable && (
-                                <div>
-                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Giá bán lẻ</label>
-                                    <div className="relative">
-                                        <input name="sellPrice" type="number" defaultValue={editingIng?.sellPrice || 0} placeholder="0" className="w-full p-4 pr-10 bg-white border border-blue-200 rounded-xl font-bold outline-none focus:border-blue-500 text-sm shadow-sm" />
-                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+
+                        {/* Tabs */}
+                        <div className="flex px-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
+                            <button type="button" className="px-4 py-3 text-sm font-bold text-emerald-600 border-b-2 border-emerald-600">Thông tin</button>
+                            <button type="button" className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">Mô tả</button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 custom-scrollbar">
+                            
+                            {/* Block 1: Thông tin cơ bản & Ảnh */}
+                            <div className="flex flex-col md:flex-row gap-6 mb-6">
+                                <div className="flex-1 space-y-4">
+                                    <div>
+                                        <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên hàng <span className="text-red-500">*</span></label>
+                                        <input name="name" defaultValue={editingIng?.name} placeholder="Nhập tên hàng hóa..." className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all" required />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Nhóm hàng</label>
+                                            <select name="category" defaultValue={editingIng?.category || categories[0]} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+                                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Đơn vị tính <span className="text-red-500">*</span></label>
+                                            <input name="unit" defaultValue={editingIng?.unit} placeholder="vd: Kg, Lít, Gói..." className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all" required />
+                                        </div>
                                     </div>
                                 </div>
-                            )}
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Danh mục</label>
-                                <select name="category" defaultValue={editingIng?.category || categories[0]} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm">
-                                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                
+                                {/* Image Upload Area */}
+                                <div className="w-full md:w-48 shrink-0">
+                                    <div className="border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center h-32 md:h-full min-h-[140px] text-slate-400 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-500 transition-all">
+                                        <Icon name="image-plus" size={28} className="mb-2"/>
+                                        <span className="text-xs font-medium">+ Thêm ảnh</span>
+                                        <span className="text-[10px] text-slate-400 mt-1">Tối đa 2MB</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Block 2: Giá vốn, giá bán */}
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 mb-6 shadow-sm">
+                                <div className="flex items-center justify-between mb-4 cursor-pointer">
+                                    <h4 className="font-bold text-sm text-slate-800">Giá vốn, giá bán</h4>
+                                    <Icon name="chevron-up" size={16} className="text-slate-400"/>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Giá vốn</label>
+                                        <div className="relative">
+                                            <input name="costPrice" type="number" defaultValue={editingIng?.lastPrice || 0} className="w-full p-2.5 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right transition-all" required />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between items-end mb-1.5">
+                                            <label className="text-[13px] font-medium text-slate-600 block">Giá bán</label>
+                                            {!isIngSellable && <span className="text-[10px] text-orange-500 italic">Cần tích "Bán trực tiếp" để nhập</span>}
+                                        </div>
+                                        <div className="relative">
+                                            <input name="sellPrice" type="number" defaultValue={editingIng?.sellPrice || 0} disabled={!isIngSellable} className="w-full p-2.5 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right disabled:bg-slate-50 disabled:text-slate-400 transition-all" />
+                                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Block 3: Tồn kho */}
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <div className="flex items-center justify-between mb-4 cursor-pointer">
+                                    <h4 className="font-bold text-sm text-slate-800">Tồn kho</h4>
+                                    <Icon name="chevron-up" size={16} className="text-slate-400"/>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                    <div className="md:col-span-1">
+                                        <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tồn kho ban đầu</label>
+                                        <input name="stock" type="number" step="0.1" defaultValue={editingIng?.stock || 0} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right transition-all" required />
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* Modal Footer (Action Bar) */}
+                        <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex flex-col-reverse md:flex-row justify-between items-center gap-4 rounded-b-xl">
+                            <label className="flex items-center gap-2 cursor-pointer w-full md:w-auto p-2 md:p-0 rounded-lg hover:bg-slate-50 transition-colors">
+                                <input type="checkbox" name="isSellable" checked={isIngSellable} onChange={(e) => setIsIngSellable(e.target.checked)} className="w-4 h-4 accent-emerald-500 rounded cursor-pointer" />
+                                <span className="text-sm font-bold text-slate-700 select-none">Bán trực tiếp trên POS</span>
+                            </label>
+                            
+                            <div className="flex gap-2 w-full md:w-auto">
+                                <button type="button" onClick={() => setShowIngModal(false)} className="flex-1 md:flex-none px-6 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all">Bỏ qua</button>
+                                <button type="submit" className="flex-1 md:flex-none px-8 py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 shadow-sm transition-all flex items-center justify-center">Lưu</button>
                             </div>
                         </div>
-                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu dữ liệu</button>
-                        <button type="button" onClick={() => setShowIngModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
                     </form>
                 </div>
             )}
 
-            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN */}
+            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN KÈM RECIPE (KIOTVIET STYLE) */}
             {showAddMenu && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <form onSubmit={handleProductSubmit} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
-                        <h3 className="text-xl font-black uppercase italic mb-6">{editingProduct ? 'Sửa thông tin món' : 'Thêm món mới'}</h3>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên Món</label>
-                                <input value={newProductForm.name} onChange={e => setNewProductForm({...newProductForm, name: e.target.value})} placeholder="vd: Trà sữa trân châu" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                            </div>
-                            <div className="flex gap-3">
-                                <div className="flex-1">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Danh mục</label>
-                                    <select value={newProductForm.category} onChange={e => setNewProductForm({...newProductForm, category: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm">
-                                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                                    </select>
-                                </div>
-                                <div className="w-24">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Icon</label>
-                                    <input value={newProductForm.image} onChange={e => setNewProductForm({...newProductForm, image: e.target.value})} placeholder="🍵" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-center text-xl" />
-                                </div>
-                            </div>
-                            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                <div className="flex justify-between items-center mb-3">
-                                    <p className="text-[10px] font-black uppercase text-slate-400">Các Biến thể (Size / Giá)</p>
-                                    <button type="button" onClick={addVariant} className="text-[10px] font-bold text-blue-600 bg-blue-100 px-3 py-1.5 rounded-lg hover:bg-blue-200 transition-colors">+ Thêm Size</button>
-                                </div>
-                                {newProductForm.variants.map((v, idx) => (
-                                    <div key={idx} className="mb-4 pb-4 border-b border-slate-200 last:border-0 last:pb-0 last:mb-0">
-                                        <div className="flex gap-2 mb-2 items-end">
-                                            <div className="w-1/4">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Size</label>
-                                                <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="M..." className="w-full p-3 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
-                                            </div>
-                                            <div className="flex-1">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá vốn</label>
-                                                <div className="relative">
-                                                    <input value={v.costPrice} type="number" onChange={(e) => updateVariant(idx, 'costPrice', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" />
-                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
-                                                </div>
-                                            </div>
-                                            <div className="flex-1">
-                                                <label className="text-[9px] font-black uppercase text-slate-400 mb-1 block">Giá bán</label>
-                                                <div className="relative">
-                                                    <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="0" className="w-full p-3 pr-6 bg-white border border-slate-200 rounded-lg font-bold text-sm outline-none focus:border-emerald-500" required />
-                                                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">đ</span>
-                                                </div>
-                                            </div>
-                                            {newProductForm.variants.length > 1 && (
-                                                <button type="button" onClick={() => removeVariant(idx)} className="p-3 mb-0.5 text-red-400 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors border border-transparent hover:border-red-100"><Icon name="trash-2" size={16}/></button>
-                                            )}
-                                        </div>
-                                        <div className="bg-white p-3 rounded-xl border border-slate-100">
-                                            <div className="flex justify-between items-center mb-2">
-                                                <span className="text-[9px] font-black uppercase text-emerald-600"><Icon name="database" size={10} className="mr-1 inline"/> Định mức kho</span>
-                                                <button type="button" onClick={() => addRecipeItem(idx)} className="text-[9px] bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg font-bold">+ Thêm NL</button>
-                                            </div>
-                                            {v.recipe && v.recipe.length > 0 ? (
-                                                v.recipe.map((r, rIdx) => {
-                                                    const selectedIng = ingredients.find(i => Number(i.id) === Number(r.ingId));
-                                                    return (
-                                                        <div key={rIdx} className="flex gap-2 items-center mb-2 last:mb-0">
-                                                            <select value={r.ingId} onChange={e => updateRecipeItem(idx, rIdx, 'ingId', e.target.value)} className="flex-1 p-2 text-xs font-bold border border-slate-200 bg-slate-50 rounded-lg outline-none">
-                                                                {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
-                                                            </select>
-                                                            <div className="w-24 relative">
-                                                                <input type="number" step="0.1" value={r.amount} onChange={e => updateRecipeItem(idx, rIdx, 'amount', e.target.value)} className="w-full p-2 pr-8 text-xs font-bold border border-slate-200 bg-slate-50 rounded-lg outline-none" placeholder="SL"/>
-                                                                <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">{selectedIng?.unit || ''}</span>
-                                                            </div>
-                                                            <button type="button" onClick={() => removeRecipeItem(idx, rIdx)} className="text-red-400 p-2 hover:bg-red-50 rounded-lg"><Icon name="x" size={14}/></button>
-                                                        </div>
-                                                    )
-                                                })
-                                            ) : (
-                                                <p className="text-[9px] text-slate-400 italic">Chưa cài đặt định mức kho cho size này.</p>
-                                            )}
-                                            {v.recipe && v.recipe.length > 0 && (
-                                                <div className="text-[9px] font-black text-slate-500 mt-2 text-right border-t border-slate-50 pt-2">
-                                                    Vốn NL dự tính: <span className="text-orange-500 text-xs">{(v.recipe.reduce((sum, r) => {
-                                                        const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
-                                                        return sum + (ing ? (ing.lastPrice || 0) * r.amount : 0);
-                                                    }, 0)).toLocaleString()}đ</span>
-                                                </div>
-                                            )}
-                                        </div>
+                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-sm">
+                    <form onSubmit={handleProductSubmit} className="bg-white rounded-xl w-full max-w-5xl flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden shadow-2xl">
+                        
+                        {/* Modal Header */}
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                            <h3 className="text-lg font-bold text-slate-800">{editingProduct ? 'Sửa thông tin món' : 'Thêm món mới'}</h3>
+                            <button type="button" onClick={() => setShowAddMenu(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
+                        </div>
+
+                        {/* Tabs */}
+                        <div className="flex px-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
+                            <button type="button" className="px-4 py-3 text-sm font-bold text-emerald-600 border-b-2 border-emerald-600">Thông tin</button>
+                            <button type="button" className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">Mô tả</button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 custom-scrollbar">
+                            
+                            {/* Block 1: Thông tin cơ bản & Ảnh */}
+                            <div className="flex flex-col md:flex-row gap-6 mb-6">
+                                <div className="flex-1 space-y-4">
+                                    <div>
+                                        <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên món <span className="text-red-500">*</span></label>
+                                        <input value={newProductForm.name} onChange={e => setNewProductForm({...newProductForm, name: e.target.value})} placeholder="Nhập tên món ăn/đồ uống..." className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all" required />
                                     </div>
-                                ))}
+                                    <div>
+                                        <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Nhóm hàng (Danh mục)</label>
+                                        <select value={newProductForm.category} onChange={e => setNewProductForm({...newProductForm, category: e.target.value})} className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all">
+                                            {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                {/* Image/Icon Input */}
+                                <div className="w-full md:w-48 shrink-0">
+                                    <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Icon/Emoji hiển thị</label>
+                                    <div className="border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center h-28 text-slate-400 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all overflow-hidden relative cursor-pointer hover:bg-emerald-50 hover:border-emerald-300">
+                                        <input value={newProductForm.image} onChange={e => setNewProductForm({...newProductForm, image: e.target.value})} className="absolute inset-0 w-full h-full text-center text-5xl bg-transparent outline-none cursor-pointer" placeholder="🍵" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Block 2: Thuộc tính & Định mức */}
+                            <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                                    <h4 className="font-bold text-sm text-slate-800">Thuộc tính (Size), Giá bán & Định mức</h4>
+                                    <button type="button" onClick={addVariant} className="text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors flex items-center gap-1"><Icon name="plus" size={14}/> Thêm Size</button>
+                                </div>
+                                
+                                <div className="space-y-6">
+                                    {newProductForm.variants.map((v, idx) => (
+                                        <div key={idx} className="p-4 bg-slate-50 border border-slate-200 rounded-xl relative">
+                                            {newProductForm.variants.length > 1 && (
+                                                <button type="button" onClick={() => removeVariant(idx)} className="absolute top-3 right-3 text-slate-400 hover:text-red-500 transition-colors"><Icon name="trash-2" size={18}/></button>
+                                            )}
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 pr-6">
+                                                <div>
+                                                    <label className="text-[12px] font-medium text-slate-600 mb-1 block">Tên Size <span className="text-red-500">*</span></label>
+                                                    <input value={v.size} onChange={(e) => updateVariant(idx, 'size', e.target.value)} placeholder="M, L, XL..." className="w-full p-2 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 transition-all" required />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[12px] font-medium text-slate-600 mb-1 block">Giá vốn</label>
+                                                    <div className="relative">
+                                                        <input value={v.costPrice} type="number" onChange={(e) => updateVariant(idx, 'costPrice', e.target.value)} placeholder="0" className="w-full p-2 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 text-right transition-all" />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[12px] font-medium text-slate-600 mb-1 block">Giá bán <span className="text-red-500">*</span></label>
+                                                    <div className="relative">
+                                                        <input value={v.price} type="number" onChange={(e) => updateVariant(idx, 'price', e.target.value)} placeholder="0" className="w-full p-2 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 text-right font-bold text-emerald-600 transition-all" required />
+                                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Định mức nguyên liệu */}
+                                            <div className="bg-white p-3 rounded-lg border border-slate-200">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <span className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5"><Icon name="database" size={14} className="text-slate-400"/> Định mức nguyên liệu (Trừ kho)</span>
+                                                    <button type="button" onClick={() => addRecipeItem(idx)} className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1.5 rounded-md font-medium hover:bg-slate-200 transition-colors flex items-center gap-1">+ Thêm NL</button>
+                                                </div>
+                                                
+                                                {v.recipe && v.recipe.length > 0 ? (
+                                                    <div className="space-y-2 mt-3">
+                                                        {v.recipe.map((r, rIdx) => {
+                                                            const selectedIng = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                                                            return (
+                                                                <div key={rIdx} className="flex gap-2 items-center">
+                                                                    <select value={r.ingId} onChange={e => updateRecipeItem(idx, rIdx, 'ingId', e.target.value)} className="flex-1 p-2 text-xs font-medium border border-slate-300 bg-white rounded-lg outline-none focus:border-emerald-500">
+                                                                        {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
+                                                                    </select>
+                                                                    <div className="w-28 relative">
+                                                                        <input type="number" step="0.1" value={r.amount} onChange={e => updateRecipeItem(idx, rIdx, 'amount', e.target.value)} className="w-full p-2 pr-10 text-xs font-medium border border-slate-300 bg-white rounded-lg outline-none focus:border-emerald-500 text-right" placeholder="SL"/>
+                                                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">{selectedIng?.unit || ''}</span>
+                                                                    </div>
+                                                                    <button type="button" onClick={() => removeRecipeItem(idx, rIdx)} className="text-slate-400 p-2 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"><Icon name="x" size={16}/></button>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                        <div className="text-[11px] font-medium text-slate-500 mt-2 flex justify-end items-center gap-2 border-t border-slate-100 pt-2">
+                                                            <span>Tổng vốn NL dự tính:</span>
+                                                            <span className="text-orange-600 font-bold text-sm">{(v.recipe.reduce((sum, r) => {
+                                                                const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                                                                return sum + (ing ? (ing.lastPrice || 0) * r.amount : 0);
+                                                            }, 0)).toLocaleString()}đ</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <p className="text-[11px] text-slate-400 italic text-center py-2 bg-slate-50 rounded border border-dashed border-slate-200">Chưa cài đặt nguyên liệu trừ kho cho size này.</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         </div>
-                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu Món</button>
-                        <button type="button" onClick={() => setShowAddMenu(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
+
+                        {/* Modal Footer (Action Bar) */}
+                        <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3 rounded-b-xl">
+                            <button type="button" onClick={() => setShowAddMenu(false)} className="px-6 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all">Bỏ qua</button>
+                            <button type="submit" className="px-8 py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 shadow-sm transition-all flex items-center justify-center">Lưu</button>
+                        </div>
                     </form>
                 </div>
             )}
 
-            {/* MODAL SỬA LỊCH SỬ BÁN HÀNG */}
+            {/* MODAL SỬA LỊCH SỬ BÁN HÀNG (KIOTVIET STYLE) */}
             {showHistoryEditModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <form onSubmit={saveHistoryEdit} className="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-black uppercase italic mb-6">Sửa Hóa Đơn</h3>
-                        <div className="space-y-4">
+                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <form onSubmit={saveHistoryEdit} className="bg-white rounded-xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                            <h3 className="text-lg font-bold text-slate-800">Sửa Hóa Đơn</h3>
+                            <button type="button" onClick={() => setShowHistoryEditModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
+                        </div>
+                        <div className="p-6 bg-slate-50 space-y-5">
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tên Khách Hàng</label>
-                                <input name="customer" defaultValue={editingHistoryItem?.customer} placeholder="Tên khách" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
+                                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên Khách Hàng</label>
+                                <input name="customer" defaultValue={editingHistoryItem?.customer} placeholder="Nhập tên khách..." className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all" required />
                             </div>
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tổng Số Tiền</label>
+                                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tổng Số Tiền</label>
                                 <div className="relative">
-                                    <input name="total" type="number" defaultValue={editingHistoryItem?.total} placeholder="0" className="w-full p-4 pr-10 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                                    <input name="total" type="number" defaultValue={editingHistoryItem?.total} placeholder="0" className="w-full p-2.5 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right font-bold text-emerald-600 transition-all" required />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
                                 </div>
                             </div>
-                            <div className="bg-orange-50 p-3 rounded-xl">
-                                <p className="text-[10px] font-bold text-orange-600 leading-relaxed"><Icon name="alert-circle" size={12} className="inline mr-1" />Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng XÓA hóa đơn và tạo đơn mới.</p>
+                            <div className="bg-orange-50 border border-orange-100 p-3.5 rounded-lg flex gap-2 items-start mt-2">
+                                <Icon name="alert-circle" size={16} className="text-orange-500 mt-0.5 shrink-0" />
+                                <p className="text-[12px] font-medium text-orange-700 leading-relaxed">Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng <b>Xóa</b> hóa đơn để hệ thống tự hoàn lại kho, sau đó tạo đơn mới.</p>
                             </div>
                         </div>
-                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Cập nhật hóa đơn</button>
-                        <button type="button" onClick={() => setShowHistoryEditModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
+                        <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3">
+                            <button type="button" onClick={() => setShowHistoryEditModal(false)} className="px-6 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all">Bỏ qua</button>
+                            <button type="submit" className="px-8 py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 shadow-sm transition-all">Cập nhật</button>
+                        </div>
                     </form>
                 </div>
             )}
 
-            {/* MODAL SỬA PHIẾU KHO */}
+            {/* MODAL SỬA PHIẾU KHO (KIOTVIET STYLE) */}
             {showStockTransEditModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <form onSubmit={saveStockTransEdit} className="bg-white rounded-[2rem] w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-black uppercase italic mb-6">Sửa Phiếu Kho</h3>
-                        <div className="space-y-4">
+                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <form onSubmit={saveStockTransEdit} className="bg-white rounded-xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                            <h3 className="text-lg font-bold text-slate-800">Sửa Phiếu Kho</h3>
+                            <button type="button" onClick={() => setShowStockTransEditModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
+                        </div>
+                        <div className="p-6 bg-slate-50 space-y-5">
                             <div>
-                                <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Tổng Số Tiền Nhập</label>
+                                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tổng Số Tiền Nhập</label>
                                 <div className="relative">
-                                    <input name="total" type="number" defaultValue={editingStockTrans?.total} placeholder="0" className="w-full p-4 pr-10 bg-slate-50 border border-slate-100 rounded-xl font-bold outline-none focus:border-emerald-500 text-sm" required />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">đ</span>
+                                    <input name="total" type="number" defaultValue={editingStockTrans?.total} placeholder="0" className="w-full p-2.5 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right font-bold text-emerald-600 transition-all" required />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
                                 </div>
                             </div>
                         </div>
-                        <button type="submit" className="w-full mt-6 py-4 bg-emerald-600 text-white rounded-xl font-black uppercase shadow-lg text-xs">Lưu thay đổi</button>
-                        <button type="button" onClick={() => setShowStockTransEditModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 rounded-xl hover:bg-slate-50 transition-colors">Hủy bỏ</button>
+                        <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3">
+                            <button type="button" onClick={() => setShowStockTransEditModal(false)} className="px-6 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all">Bỏ qua</button>
+                            <button type="submit" className="px-8 py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 shadow-sm transition-all">Lưu thay đổi</button>
+                        </div>
                     </form>
                 </div>
             )}
 
-            {/* MODAL QUẢN LÝ DANH MỤC */}
+            {/* MODAL QUẢN LÝ DANH MỤC (KIOTVIET STYLE) */}
             {showCatModal && (
-                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-                        <h3 className="text-xl font-black uppercase italic mb-6">Quản lý danh mục</h3>
-                        <div className="space-y-3 mb-6">
+                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl w-full max-w-md flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden">
+                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
+                            <h3 className="text-lg font-bold text-slate-800">Quản lý danh mục</h3>
+                            <button type="button" onClick={() => setShowCatModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-6 bg-slate-50 space-y-3 custom-scrollbar">
                             {categories.map(cat => (
-                                <div key={cat} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                                <div key={cat} className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-slate-200 shadow-sm">
                                     {editingCat.old === cat ? (
                                         <div className="flex flex-1 gap-2">
                                             <input 
                                                 autoFocus
                                                 value={editingCat.new} 
                                                 onChange={(e) => setEditingCat({...editingCat, new: e.target.value})}
-                                                className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-200 text-sm font-bold outline-none"
+                                                className="flex-1 px-3 py-2 bg-white rounded-lg border border-slate-300 text-sm font-bold outline-none focus:border-emerald-500"
                                             />
-                                            <button onClick={() => handleEditCategory(editingCat.old, editingCat.new)} className="p-2 bg-emerald-500 text-white rounded-lg"><Icon name="check" size={16}/></button>
-                                            <button onClick={() => setEditingCat({old: '', new: ''})} className="p-2 bg-slate-200 text-slate-600 rounded-lg"><Icon name="x" size={16}/></button>
+                                            <button onClick={() => handleEditCategory(editingCat.old, editingCat.new)} className="p-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors"><Icon name="check" size={16}/></button>
+                                            <button onClick={() => setEditingCat({old: '', new: ''})} className="p-2 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition-colors"><Icon name="x" size={16}/></button>
                                         </div>
                                     ) : (
                                         <>
                                             <span className="font-bold text-sm text-slate-700 flex-1">{cat}</span>
                                             <div className="flex gap-2">
-                                                <button onClick={() => setEditingCat({old: cat, new: cat})} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><Icon name="edit-3" size={16}/></button>
-                                                <button onClick={() => handleDeleteCategory(cat)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Icon name="trash-2" size={16}/></button>
+                                                <button onClick={() => setEditingCat({old: cat, new: cat})} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"><Icon name="edit-3" size={16}/></button>
+                                                <button onClick={() => handleDeleteCategory(cat)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Icon name="trash-2" size={16}/></button>
                                             </div>
                                         </>
                                     )}
                                 </div>
                             ))}
                         </div>
-                        <button type="button" onClick={() => setShowCatModal(false)} className="w-full mt-2 text-slate-400 font-bold text-[10px] uppercase py-3 border border-slate-100 rounded-xl hover:bg-slate-50 transition-all">Đóng</button>
+                        <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3">
+                            <button type="button" onClick={() => setShowCatModal(false)} className="px-8 py-2.5 bg-slate-900 text-white rounded-lg font-bold text-sm hover:bg-slate-800 transition-all">Đóng</button>
+                        </div>
                     </div>
                 </div>
             )}
