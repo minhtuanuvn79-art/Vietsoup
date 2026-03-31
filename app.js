@@ -291,7 +291,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [notifications, setNotifications] = useState([]);
     const [stocktakeSearch, setStocktakeSearch] = useState(''); // Tìm kiếm trong bảng kiểm kho
 
-    // Inventory Sub-tabs State
+// Inventory Sub-tabs State
     const [inventoryTab, setInventoryTab] = useState('stock'); 
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
@@ -299,6 +299,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [historySubTab, setHistorySubTab] = useState('import'); // Chuyển đổi giữa Nhập hàng / Kiểm kho
     const [expandedTransId, setExpandedTransId] = useState(null); // Quản lý việc xổ xuống chi tiết phiếu
     
+    // Các State thêm mới cho tính năng Nhập hàng nâng cao
+    const [importSupplier, setImportSupplier] = useState(''); // Nhà cung cấp
+    const [importNote, setImportNote] = useState(''); // Ghi chú nhập hàng
+    const [editingImportId, setEditingImportId] = useState(null); // ID phiếu đang sửa
     // Report Filter States
     const [reportFilter, setReportFilter] = useState('today');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
@@ -928,6 +932,25 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setImportCart(prev => prev.filter(item => item.id !== id));
     };
 
+    const clearImportForm = () => {
+        setImportCart([]);
+        setImportSupplier('');
+        setImportNote('');
+        setEditingImportId(null);
+        setImportSearch('');
+    };
+
+    const loadImportForEdit = (trans) => {
+        setImportCart(trans.items.map(item => {
+            const ing = ingredients.find(i => i.id === item.id) || item;
+            return { ...ing, id: item.id, name: item.name, importQty: String(item.qty), importPrice: String(item.price) };
+        }));
+        setImportSupplier(trans.supplier || '');
+        setImportNote(trans.note || '');
+        setEditingImportId(trans.id);
+        setInventoryTab('import');
+    };
+
     const handleCompleteImport = () => {
         if (importCart.length === 0) return;
         
@@ -937,29 +960,54 @@ const AppPOS = ({ onNavigateAdmin }) => {
             finalPrice: parseFloat(item.importPrice) || 0
         }));
         
-        const updatedIngredients = ingredients.map(ing => {
+        let updatedIngredients = [...ingredients];
+        
+        // Nếu ĐANG SỬA PHIẾU: Hoàn tác số lượng tồn kho cũ trước
+        if (editingImportId) {
+            const oldTrans = stockTransactions.find(t => t.id === editingImportId);
+            if (oldTrans) {
+                oldTrans.items.forEach(oldItem => {
+                    const idx = updatedIngredients.findIndex(ing => ing.id === oldItem.id);
+                    if (idx !== -1) updatedIngredients[idx].stock -= oldItem.qty;
+                });
+            }
+        }
+
+        // Cộng số lượng mới và cập nhật giá vốn
+        updatedIngredients = updatedIngredients.map(ing => {
             const importedItem = processedImport.find(item => item.id === ing.id);
             if (importedItem) {
                 return { ...ing, stock: ing.stock + importedItem.finalQty, lastPrice: importedItem.finalPrice };
             }
             return ing;
         });
+
         setIngredients(updatedIngredients);
 
         const totalCost = processedImport.reduce((sum, item) => sum + (item.finalQty * item.finalPrice), 0);
+        
         const transaction = {
-            id: `IMP${Date.now()}`,
+            id: editingImportId || `IMP${Date.now()}`,
             type: 'import',
-            timestamp: new Date().toISOString(),
+            timestamp: editingImportId ? stockTransactions.find(t=>t.id === editingImportId).timestamp : new Date().toISOString(),
             items: processedImport.map(i => ({ id: i.id, name: i.name, qty: i.finalQty, price: i.finalPrice })),
             total: totalCost,
-            seller: currentUser.name
+            seller: currentUser.name,
+            supplier: importSupplier,
+            note: importNote
         };
         
-        setStockTransactions([transaction, ...stockTransactions]);
-        setImportCart([]);
-        setInventoryTab('stock');
-        showNotification(`Nhập hàng thành công! Tổng: ${totalCost.toLocaleString()}đ`, 'success');
+        if (editingImportId) {
+            setStockTransactions(prev => prev.map(t => t.id === editingImportId ? transaction : t));
+            showNotification(`Đã cập nhật phiếu nhập ${editingImportId}!`, 'success');
+        } else {
+            setStockTransactions([transaction, ...stockTransactions]);
+            showNotification(`Nhập hàng thành công! Tổng: ${totalCost.toLocaleString()}đ`, 'success');
+        }
+        
+        clearImportForm();
+        setInventoryTab('history'); 
+        setHistorySubTab('import');
     };
 
     const startStocktake = () => {
@@ -1257,80 +1305,140 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: NHẬP HÀNG */}
+{/* TAB: NHẬP HÀNG (KIOTVIET STYLE - CREATE & EDIT) */}
                             {inventoryTab === 'import' && (
-                                <div className="flex flex-col h-full gap-4 relative">
-                                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm shrink-0 z-10">
-                                        <div className="relative">
-                                            <Icon name="search" className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                                            <input 
-                                                type="text" 
-                                                placeholder="Tìm nguyên liệu / hàng hóa để nhập..." 
-                                                value={importSearch} 
-                                                onChange={(e) => setImportSearch(e.target.value)} 
-                                                className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none focus:border-blue-500" 
-                                            />
-                                            {importSearch && (
-                                                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-100 max-h-60 overflow-y-auto">
-                                                    {ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).map(ing => (
-                                                        <button 
-                                                            key={ing.id} 
-                                                            onClick={() => addToImport(ing)}
-                                                            className="w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-slate-50 flex justify-between items-center font-bold text-sm"
-                                                        >
-                                                            <span>{ing.name} <span className="text-[10px] text-slate-400 ml-2">({ing.unit})</span></span>
-                                                            <span className="text-blue-500 text-xs"><Icon name="plus-circle" size={16}/></span>
-                                                        </button>
-                                                    ))}
+                                <div className="flex flex-col xl:flex-row gap-4 h-full pb-2">
+                                    {/* MAIN AREA: BẢNG NHẬP HÀNG */}
+                                    <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+                                        {/* Header & Thanh tìm kiếm */}
+                                        <div className="p-4 border-b border-slate-100 flex gap-4 items-center shrink-0 bg-slate-50 relative">
+                                            <h3 className="font-black text-sm uppercase text-slate-800 hidden md:block w-32">
+                                                {editingImportId ? 'Sửa phiếu nhập' : 'Phiếu nhập mới'}
+                                            </h3>
+                                            <div className="flex-1 relative">
+                                                <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Tìm hàng hóa để thêm vào phiếu nhập (Nhấn Enter)..." 
+                                                    value={importSearch || ''}
+                                                    onChange={(e) => setImportSearch(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && importSearch.trim() !== '') {
+                                                            const match = ingredients.find(i => i.name.toLowerCase().includes(importSearch.toLowerCase()));
+                                                            if (match) addToImport(match);
+                                                        }
+                                                    }}
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
+                                                />
+                                                {importSearch && (
+                                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
+                                                        {ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).length > 0 ? (
+                                                            ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).map(ing => (
+                                                                <button 
+                                                                    key={ing.id} type="button" onClick={() => addToImport(ing)}
+                                                                    className="w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-blue-50 flex justify-between items-center font-medium text-sm text-slate-700 transition-colors"
+                                                                >
+                                                                    <span>{ing.name} <span className="text-[10px] text-slate-400 ml-2">({ing.unit})</span></span>
+                                                                    <span className="text-blue-500 text-xs"><Icon name="plus-circle" size={16}/></span>
+                                                                </button>
+                                                            ))
+                                                        ) : <div className="px-4 py-3 text-sm text-slate-400 text-center">Không tìm thấy hàng hóa</div>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Table danh sách */}
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white relative">
+                                            {importCart.length === 0 ? (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                                                        <Icon name="package-plus" size={32} className="text-slate-300" />
+                                                    </div>
+                                                    <p className="font-bold text-sm text-slate-600 mb-1">Phiếu nhập đang trống</p>
+                                                    <p className="text-xs max-w-sm">Sử dụng thanh tìm kiếm phía trên để tìm và thêm nguyên liệu/hàng hóa cần nhập.</p>
                                                 </div>
+                                            ) : (
+                                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                                    <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                                        <tr>
+                                                            <th className="p-3 pl-4 w-12 border-b border-slate-200 text-center text-[11px] text-slate-400"><Icon name="trash-2" size={14} className="mx-auto" /></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Tên hàng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-20 text-center">ĐVT</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-28 text-right">Số lượng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-36 text-right">Đơn giá</th>
+                                                            <th className="p-3 pr-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-32 text-right">Thành tiền</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {importCart.map(item => {
+                                                            const currentQty = parseFloat(item.importQty) || 0;
+                                                            const currentPrice = parseFloat(item.importPrice) || 0;
+                                                            return (
+                                                                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                                    <td className="p-3 pl-4 text-center">
+                                                                        <button onClick={() => removeFromImport(item.id)} className="text-slate-300 hover:text-red-500 transition-colors bg-white hover:bg-red-50 p-1.5 rounded-lg"><Icon name="trash-2" size={16}/></button>
+                                                                    </td>
+                                                                    <td className="p-3 text-xs font-bold text-slate-800">{item.name}</td>
+                                                                    <td className="p-3 text-xs text-slate-500 text-center font-medium">{item.unit}</td>
+                                                                    <td className="p-2.5">
+                                                                        <input type="number" step="0.1" value={item.importQty} onChange={(e) => updateImportCart(item.id, 'importQty', e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-blue-500 transition-all shadow-sm" />
+                                                                    </td>
+                                                                    <td className="p-2.5">
+                                                                        <input type="number" value={item.importPrice} onChange={(e) => updateImportCart(item.id, 'importPrice', e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-blue-500 transition-all shadow-sm" />
+                                                                    </td>
+                                                                    <td className="p-3 pr-4 text-xs font-black text-blue-600 text-right">
+                                                                        {(currentQty * currentPrice).toLocaleString()}đ
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
                                             )}
                                         </div>
                                     </div>
 
-                                    <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                                        <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
-                                            <h3 className="font-black text-xs uppercase text-slate-600">Phiếu nhập hàng</h3>
-                                            <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded text-[10px] font-black">{importCart.length} món</span>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto p-2 space-y-2 custom-scrollbar">
-                                            {importCart.length === 0 ? (
-                                                <p className="text-center text-slate-400 font-bold text-xs mt-10">Chưa chọn hàng hóa nào</p>
-                                            ) : (
-                                                importCart.map(item => {
-                                                    const currentQty = parseFloat(item.importQty) || 0;
-                                                    const currentPrice = parseFloat(item.importPrice) || 0;
-                                                    return (
-                                                    <div key={item.id} className="p-3 bg-white border border-slate-100 rounded-xl shadow-sm">
-                                                        <div className="flex justify-between items-center mb-2">
-                                                            <h4 className="font-black text-xs uppercase">{item.name}</h4>
-                                                            <button onClick={() => removeFromImport(item.id)} className="text-red-400 hover:text-red-600"><Icon name="x" size={16}/></button>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <div className="flex-1">
-                                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">SL nhập ({item.unit})</label>
-                                                                <input type="number" step="0.1" value={item.importQty} onChange={(e) => updateImportCart(item.id, 'importQty', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold outline-none focus:border-blue-500" />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Đơn giá (đ)</label>
-                                                                <input type="number" value={item.importPrice} onChange={(e) => updateImportCart(item.id, 'importPrice', e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-bold outline-none focus:border-blue-500" />
-                                                            </div>
-                                                            <div className="flex-1">
-                                                                <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Thành tiền</label>
-                                                                <div className="w-full p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-black text-emerald-600 text-right overflow-hidden text-ellipsis">
-                                                                    {(currentQty * currentPrice).toLocaleString()}đ
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )})
-                                            )}
-                                        </div>
-                                        <div className="p-4 border-t border-slate-100 bg-white shrink-0">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <span className="font-black text-xs uppercase text-slate-500">Tổng tiền nhập</span>
-                                                <span className="font-black text-xl text-blue-600">{importCart.reduce((sum, item) => sum + ((parseFloat(item.importQty)||0) * (parseFloat(item.importPrice)||0)), 0).toLocaleString()}đ</span>
+                                    {/* SIDEBAR BÊN PHẢI: THÔNG TIN PHIẾU */}
+                                    <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 xl:flex-none">
+                                            <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                                                <span className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5"><Icon name="user" size={14}/> Người tạo</span>
+                                                <span className="text-sm font-black text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{currentUser.name}</span>
                                             </div>
-                                            <button onClick={handleCompleteImport} disabled={importCart.length === 0} className="w-full py-3 bg-blue-600 disabled:bg-slate-300 text-white font-black text-xs uppercase rounded-xl shadow-lg">Hoàn thành nhập hàng</button>
+                                            
+                                            <div className="space-y-4 mb-6">
+                                                <div>
+                                                    <label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Nhà cung cấp</label>
+                                                    <input type="text" placeholder="Tên đối tác / NCC..." value={importSupplier} onChange={(e) => setImportSupplier(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 shadow-sm" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Ghi chú</label>
+                                                    <textarea rows="3" placeholder="Nhập ghi chú..." value={importNote} onChange={(e) => setImportNote(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 resize-none shadow-sm"></textarea>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-slate-100 pt-5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold text-slate-500">Số lượng mặt hàng:</span>
+                                                    <span className="text-sm font-black text-slate-800">{importCart.length}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-blue-50 p-3 rounded-xl border border-blue-100">
+                                                    <span className="text-xs font-bold text-blue-800">Cần trả NCC:</span>
+                                                    <span className="text-xl font-black text-blue-600">
+                                                        {importCart.reduce((sum, item) => sum + ((parseFloat(item.importQty)||0) * (parseFloat(item.importPrice)||0)), 0).toLocaleString()}đ
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button onClick={clearImportForm} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-500 hover:text-red-500 rounded-xl font-bold text-xs uppercase hover:bg-red-50 hover:border-red-200 transition-all shadow-sm">
+                                                Hủy bỏ
+                                            </button>
+                                            <button onClick={handleCompleteImport} disabled={importCart.length === 0} className="flex-[2] py-3.5 bg-blue-600 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs uppercase shadow-md hover:bg-blue-700 hover:shadow-lg transition-all flex items-center justify-center gap-2">
+                                                <Icon name="check-circle" size={16}/> {editingImportId ? 'Lưu thay đổi' : 'Hoàn thành'}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -1513,40 +1621,95 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     </div>
 
                                     <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 p-4">
-                                        {/* 1. MỤC LỊCH SỬ NHẬP HÀNG */}
+{/* 1. MỤC LỊCH SỬ NHẬP HÀNG (KIOTVIET STYLE: BẢNG & XỔ XUỐNG) */}
                                         {historySubTab === 'import' && (
-                                            <div className="space-y-3">
-                                                {stockTransactions.filter(t => t.type === 'import').length === 0 ? (
-                                                    <div className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch nhập hàng nào.</div>
-                                                ) : (
-                                                    stockTransactions.filter(t => t.type === 'import').map(trans => (
-                                                        <div key={trans.id} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-                                                            <div className="flex justify-between items-center mb-3 border-b border-slate-50 pb-2">
-                                                                <div>
-                                                                    <span className="px-2 py-1 rounded text-[10px] font-black uppercase text-white bg-blue-500 mr-2">Nhập hàng</span>
-                                                                    <span className="text-xs font-bold text-slate-400">#{trans.id}</span>
-                                                                </div>
-                                                                <span className="font-black text-blue-600">{trans.total?.toLocaleString()}đ</span>
-                                                            </div>
-                                                            <div className="space-y-1 mb-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                                                                {trans.items.map((i, idx) => (
-                                                                    <div key={idx} className="flex justify-between text-xs font-medium text-slate-600">
-                                                                        <span>{i.name}</span>
-                                                                        <span className="font-bold text-blue-600">+{i.qty} <span className="text-slate-400 text-[10px] font-normal">({i.price.toLocaleString()}đ/đv)</span></span>
-                                                                    </div>
-                                                                ))}
-                                                            </div>
-                                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-b border-slate-50 pb-3 mb-3">
-                                                                <span>{new Date(trans.timestamp).toLocaleString('vi-VN')}</span>
-                                                                <span className="uppercase bg-slate-100 px-2 py-0.5 rounded"><Icon name="user" size={10} className="mr-1 inline" />{trans.seller}</span>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <button onClick={() => { setEditingStockTrans(trans); setShowStockTransEditModal(true); }} className="px-4 py-2 bg-slate-100 text-slate-600 hover:text-blue-600 rounded-lg text-[10px] uppercase font-black transition-colors"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa giá trị</button>
-                                                                <button onClick={() => handleDeleteStockTrans(trans.id)} className="px-4 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa phiếu (Hoàn tác)</button>
-                                                            </div>
-                                                        </div>
-                                                    ))
-                                                )}
+                                            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                                    <thead className="bg-slate-100">
+                                                        <tr>
+                                                            <th className="w-10 p-3 border-b border-slate-200"></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Mã nhập hàng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Thời gian</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Nhà cung cấp</th>
+                                                            <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Cần trả NCC</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stockTransactions.filter(t => t.type === 'import').length === 0 ? (
+                                                            <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch nhập hàng nào.</td></tr>
+                                                        ) : (
+                                                            stockTransactions.filter(t => t.type === 'import').map(trans => {
+                                                                const isExpanded = expandedTransId === trans.id;
+                                                                return (
+                                                                    <React.Fragment key={trans.id}>
+                                                                        <tr onClick={() => setExpandedTransId(isExpanded ? null : trans.id)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/50' : ''}`}>
+                                                                            <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
+                                                                            <td className="p-3 text-xs font-bold text-blue-600">{trans.id}</td>
+                                                                            <td className="p-3 text-xs text-slate-600 font-medium">{new Date(trans.timestamp).toLocaleString('vi-VN')}</td>
+                                                                            <td className="p-3 text-xs font-bold text-slate-700">{trans.supplier || '---'}</td>
+                                                                            <td className="p-3 pr-6 text-xs font-black text-right text-slate-800">{trans.total?.toLocaleString()}đ</td>
+                                                                        </tr>
+
+                                                                        {isExpanded && (
+                                                                            <tr>
+                                                                                <td colSpan="5" className="p-0 border-b-2 border-blue-500">
+                                                                                    <div className="bg-slate-50 p-5 shadow-inner border-t border-blue-100 relative flex gap-6 flex-col lg:flex-row">
+                                                                                        <div className="flex-1">
+                                                                                            <div className="mb-4 flex justify-between items-start">
+                                                                                                <div>
+                                                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                                                        <span className="font-black text-sm text-slate-800">{trans.id}</span>
+                                                                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase">Đã nhập hàng</span>
+                                                                                                    </div>
+                                                                                                    <div className="text-[11px] text-slate-500 flex flex-wrap gap-4 mt-2">
+                                                                                                        <p>Người nhập: <span className="font-bold text-slate-700">{trans.seller}</span></p>
+                                                                                                        <p>Ngày nhập: <span className="font-bold text-slate-700">{new Date(trans.timestamp).toLocaleDateString('vi-VN')}</span></p>
+                                                                                                        {trans.note && <p>Ghi chú: <span className="font-bold text-slate-700">{trans.note}</span></p>}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="flex gap-2">
+                                                                                                    <button onClick={() => loadImportForEdit(trans)} className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                        <Icon name="edit-3" size={14}/> Sửa phiếu
+                                                                                                    </button>
+                                                                                                    <button onClick={() => handleDeleteStockTrans(trans.id)} className="px-3 py-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                        <Icon name="trash-2" size={14}/> Xóa
+                                                                                                    </button>
+                                                                                                </div>
+                                                                                            </div>
+
+                                                                                            <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                                                                                <table className="w-full text-left border-collapse">
+                                                                                                    <thead className="bg-slate-100 border-b border-slate-200">
+                                                                                                        <tr>
+                                                                                                            <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
+                                                                                                            <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-20">Số lượng</th>
+                                                                                                            <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-right w-24">Đơn giá</th>
+                                                                                                            <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-28">Thành tiền</th>
+                                                                                                        </tr>
+                                                                                                    </thead>
+                                                                                                    <tbody className="divide-y divide-slate-50">
+                                                                                                        {trans.items.map((item, idx) => (
+                                                                                                            <tr key={idx} className="hover:bg-slate-50">
+                                                                                                                <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
+                                                                                                                <td className="p-2.5 text-xs text-slate-500 text-center">{item.qty}</td>
+                                                                                                                <td className="p-2.5 text-xs text-slate-500 text-right">{item.price?.toLocaleString()}đ</td>
+                                                                                                                <td className="p-2.5 pr-4 text-xs font-black text-right text-slate-800">{(item.qty * item.price).toLocaleString()}đ</td>
+                                                                                                            </tr>
+                                                                                                        ))}
+                                                                                                    </tbody>
+                                                                                                </table>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </React.Fragment>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         )}
 
