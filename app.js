@@ -805,7 +805,30 @@ const AppPOS = ({ onNavigateAdmin }) => {
             return { ...prev, variants: newVariants };
         });
     };
+    const addSpecificRecipeItem = (variantIndex, ingId) => {
+        setNewProductForm(prev => {
+            const newVariants = [...prev.variants];
+            const currentRecipe = newVariants[variantIndex].recipe || [];
+            
+            // Kiểm tra trùng lặp nguyên liệu
+            if (currentRecipe.some(r => Number(r.ingId) === Number(ingId))) {
+                showNotification("Nguyên liệu này đã có trong định mức!", "error");
+                return prev;
+            }
+            
+            newVariants[variantIndex].recipe = [...currentRecipe, { ingId: ingId, amount: 1 }];
+            
+            // Tự động tính lại giá vốn dự kiến
+            let autoCost = 0;
+            newVariants[variantIndex].recipe.forEach(r => {
+                const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
+                if (ing) autoCost += ((ing.lastPrice || 0) * r.amount);
+            });
+            newVariants[variantIndex].costPrice = autoCost;
 
+            return { ...prev, variants: newVariants };
+        });
+    };
     const updateRecipeItem = (variantIndex, recipeIndex, field, value) => {
         setNewProductForm(prev => {
             const newVariants = [...prev.variants];
@@ -1812,40 +1835,74 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                             </div>
 
-                                            {/* Định mức nguyên liệu */}
+{/* Định mức nguyên liệu */}
                                             <div className="bg-white p-3 rounded-lg border border-slate-200">
-                                                <div className="flex justify-between items-center mb-2">
+                                                <div className="flex justify-between items-center mb-3">
                                                     <span className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5"><Icon name="database" size={14} className="text-slate-400"/> Định mức nguyên liệu (Trừ kho)</span>
-                                                    <button type="button" onClick={() => addRecipeItem(idx)} className="text-[11px] bg-slate-100 text-slate-600 px-2 py-1.5 rounded-md font-medium hover:bg-slate-200 transition-colors flex items-center gap-1">+ Thêm NL</button>
                                                 </div>
                                                 
+                                                {/* THANH TÌM KIẾM NGUYÊN LIỆU MỚI */}
+                                                <div className="relative mb-3">
+                                                    <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                    <input 
+                                                        type="text" 
+                                                        placeholder="Tìm và chọn nguyên liệu..." 
+                                                        value={v.ingSearch || ''} 
+                                                        onChange={e => updateVariant(idx, 'ingSearch', e.target.value)} 
+                                                        className="w-full pl-8 pr-3 py-2 text-xs font-medium border border-slate-300 bg-slate-50 rounded-lg outline-none focus:border-emerald-500 transition-all"
+                                                    />
+                                                    
+                                                    {/* Dropdown kết quả tìm kiếm */}
+                                                    {v.ingSearch && (
+                                                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto custom-scrollbar">
+                                                            {ingredients.filter(i => i.name.toLowerCase().includes(v.ingSearch.toLowerCase())).length > 0 ? (
+                                                                ingredients.filter(i => i.name.toLowerCase().includes(v.ingSearch.toLowerCase())).map(ing => (
+                                                                    <button 
+                                                                        key={ing.id} 
+                                                                        type="button"
+                                                                        onClick={() => {
+                                                                            addSpecificRecipeItem(idx, ing.id);
+                                                                            updateVariant(idx, 'ingSearch', ''); // Xóa ô tìm kiếm sau khi chọn
+                                                                        }}
+                                                                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-emerald-50 hover:text-emerald-600 font-medium border-b border-slate-50 last:border-0 flex justify-between items-center"
+                                                                    >
+                                                                        <span>{ing.name}</span>
+                                                                        <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">{ing.unit}</span>
+                                                                    </button>
+                                                                ))
+                                                            ) : (
+                                                                <div className="px-3 py-3 text-xs text-slate-400 text-center">Không tìm thấy nguyên liệu</div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* DANH SÁCH NGUYÊN LIỆU ĐÃ CHỌN (Gọn gàng hơn) */}
                                                 {v.recipe && v.recipe.length > 0 ? (
-                                                    <div className="space-y-2 mt-3">
+                                                    <div className="space-y-2 border-t border-slate-100 pt-3">
                                                         {v.recipe.map((r, rIdx) => {
                                                             const selectedIng = ingredients.find(i => Number(i.id) === Number(r.ingId));
                                                             return (
-                                                                <div key={rIdx} className="flex gap-2 items-center">
-                                                                    <select value={r.ingId} onChange={e => updateRecipeItem(idx, rIdx, 'ingId', e.target.value)} className="flex-1 p-2 text-xs font-medium border border-slate-300 bg-white rounded-lg outline-none focus:border-emerald-500">
-                                                                        {ingredients.map(ing => <option key={ing.id} value={ing.id}>{ing.name}</option>)}
-                                                                    </select>
-                                                                    <div className="w-28 relative">
-                                                                        <input type="number" step="0.1" value={r.amount} onChange={e => updateRecipeItem(idx, rIdx, 'amount', e.target.value)} className="w-full p-2 pr-10 text-xs font-medium border border-slate-300 bg-white rounded-lg outline-none focus:border-emerald-500 text-right" placeholder="SL"/>
+                                                                <div key={rIdx} className="flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                                    <span className="flex-1 text-xs font-bold text-slate-700 truncate pl-1">{selectedIng?.name || 'Nguyên liệu đã xóa'}</span>
+                                                                    <div className="w-24 relative">
+                                                                        <input type="number" step="0.1" value={r.amount} onChange={e => updateRecipeItem(idx, rIdx, 'amount', e.target.value)} className="w-full p-1.5 pr-8 text-xs font-bold border border-slate-300 bg-white rounded outline-none focus:border-emerald-500 text-right" placeholder="SL"/>
                                                                         <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">{selectedIng?.unit || ''}</span>
                                                                     </div>
-                                                                    <button type="button" onClick={() => removeRecipeItem(idx, rIdx)} className="text-slate-400 p-2 hover:bg-red-50 hover:text-red-500 rounded-lg transition-colors"><Icon name="x" size={16}/></button>
+                                                                    <button type="button" onClick={() => removeRecipeItem(idx, rIdx)} className="text-red-400 p-1.5 hover:bg-red-50 hover:text-red-500 rounded transition-colors"><Icon name="x" size={14}/></button>
                                                                 </div>
                                                             )
                                                         })}
-                                                        <div className="text-[11px] font-medium text-slate-500 mt-2 flex justify-end items-center gap-2 border-t border-slate-100 pt-2">
+                                                        <div className="text-[11px] font-medium text-slate-500 mt-2 flex justify-end items-center gap-2 pt-1">
                                                             <span>Tổng vốn NL dự tính:</span>
-                                                            <span className="text-orange-600 font-bold text-sm">{(v.recipe.reduce((sum, r) => {
+                                                            <span className="text-orange-600 font-black text-sm">{(v.recipe.reduce((sum, r) => {
                                                                 const ing = ingredients.find(i => Number(i.id) === Number(r.ingId));
                                                                 return sum + (ing ? (ing.lastPrice || 0) * r.amount : 0);
                                                             }, 0)).toLocaleString()}đ</span>
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <p className="text-[11px] text-slate-400 italic text-center py-2 bg-slate-50 rounded border border-dashed border-slate-200">Chưa cài đặt nguyên liệu trừ kho cho size này.</p>
+                                                    <p className="text-[11px] text-slate-400 italic text-center py-3 bg-slate-50 rounded border border-dashed border-slate-200">Chưa chọn nguyên liệu nào.</p>
                                                 )}
                                             </div>
                                         </div>
