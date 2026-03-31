@@ -308,7 +308,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSeller, setSelectedSeller] = useState('Tất cả');
-    
+    const [historyView, setHistoryView] = useState('overview'); // Chuyển đổi Tổng quan / Hóa đơn
+    const [expandedInvoiceId, setExpandedInvoiceId] = useState(null); // Quản lý xổ xuống Hóa đơn
     // Modal States
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -497,7 +498,20 @@ const AppPOS = ({ onNavigateAdmin }) => {
         });
         return { total: totalRevenue, profit: totalRevenue - totalCost, count: filteredHistory.length };
     }, [filteredHistory]);
-
+// Tính toán Top 10 hàng bán chạy theo Doanh thu
+    const topSellersList = useMemo(() => {
+        const itemMap = {};
+        filteredHistory.forEach(h => {
+            h.items.forEach(item => {
+                if (!itemMap[item.name]) itemMap[item.name] = { name: item.name, qty: 0, revenue: 0 };
+                itemMap[item.name].qty += item.quantity;
+                itemMap[item.name].revenue += (item.price * item.quantity);
+            });
+        });
+        const sorted = Object.values(itemMap).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+        const maxRev = sorted[0]?.revenue || 1;
+        return sorted.map(s => ({...s, percent: Math.max((s.revenue / maxRev) * 100, 5) })); // Tối thiểu 5% để dễ nhìn
+    }, [filteredHistory]);
     const stats = useMemo(() => ({
         lowStock: ingredients.filter(i => i.stock < 5).length
     }), [ingredients]);
@@ -1882,83 +1896,261 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         </div>
                     )}
 
+{/* TAB BÁO CÁO (KIOTVIET STYLE: TỔNG QUAN & HÓA ĐƠN) */}
                     {activeTab === 'history' && (
-                        <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
-                            <div className="bg-white p-4 rounded-2xl border border-slate-200 mb-4 shadow-sm">
-                                <div className="flex flex-col md:flex-row gap-3">
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Thời gian</label>
-                                        <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700">
-                                            <option value="today">Hôm nay</option>
-                                            <option value="yesterday">Hôm qua</option>
-                                            <option value="week">1 tuần qua</option>
-                                            <option value="month">1 tháng qua</option>
-                                            <option value="year">1 năm qua</option>
-                                            <option value="custom">Tùy chỉnh khoảng thời gian...</option>
-                                        </select>
-                                    </div>
-                                    <div className="flex-1">
-                                        <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Nhân viên bán</label>
-                                        <select value={selectedSeller} onChange={(e) => setSelectedSeller(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700">
-                                            <option value="Tất cả">Tất cả nhân viên</option>
-                                            {allSellers.map(name => (
-                                                <option key={name} value={name}>{name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                </div>
-                                {reportFilter === 'custom' && (
-                                    <div className="flex gap-3 mt-3 pt-3 border-t border-slate-100">
-                                        <div className="flex-1">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Từ ngày</label>
-                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700" />
+                        <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
+                            
+                            {/* SUB-TABS: Tổng quan / Hóa đơn */}
+                            <div className="flex gap-6 border-b border-slate-200 px-6 pt-4 bg-white shrink-0 shadow-sm z-10">
+                                <button 
+                                    onClick={() => setHistoryView('overview')}
+                                    className={`pb-3 font-black text-xs uppercase border-b-2 transition-all tracking-wider ${historyView === 'overview' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Tổng quan
+                                </button>
+                                <button 
+                                    onClick={() => setHistoryView('invoices')}
+                                    className={`pb-3 font-black text-xs uppercase border-b-2 transition-all tracking-wider ${historyView === 'invoices' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                >
+                                    Hóa đơn
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-hidden flex">
+                                
+                                {/* 1. MÀN HÌNH TỔNG QUAN (DASHBOARD) */}
+                                {historyView === 'overview' && (
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 pb-24 flex flex-col xl:flex-row gap-6">
+                                        {/* Cột trái: Thống kê & Biểu đồ */}
+                                        <div className="flex-[3] flex flex-col gap-6">
+                                            {/* Bộ lọc nhanh cho Tổng quan */}
+                                            <div className="flex justify-end gap-3">
+                                                <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none shadow-sm min-w-[150px]">
+                                                    <option value="today">Hôm nay</option>
+                                                    <option value="yesterday">Hôm qua</option>
+                                                    <option value="week">1 tuần qua</option>
+                                                    <option value="month">1 tháng qua</option>
+                                                    <option value="year">1 năm qua</option>
+                                                    <option value="custom">Tùy chỉnh...</option>
+                                                </select>
+                                                {reportFilter === 'custom' && (
+                                                    <div className="flex gap-2">
+                                                        <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none shadow-sm" />
+                                                        <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none shadow-sm" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Box KPI */}
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                                                    <span className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Icon name="dollar-sign" size={16} className="text-emerald-500"/> Doanh thu</span>
+                                                    <span className="text-2xl font-black text-slate-800">{reportStats.total.toLocaleString()}</span>
+                                                    <span className="text-[10px] font-bold text-emerald-500 mt-2 bg-emerald-50 w-fit px-2 py-0.5 rounded">{reportStats.count} hóa đơn</span>
+                                                </div>
+                                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                                                    <span className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Icon name="trending-up" size={16} className="text-blue-500"/> Lợi nhuận gộp</span>
+                                                    <span className="text-2xl font-black text-blue-600">{reportStats.profit.toLocaleString()}</span>
+                                                    <span className="text-[10px] font-medium text-slate-400 mt-2">Sau khi trừ giá vốn</span>
+                                                </div>
+                                                <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
+                                                    <span className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Icon name="shopping-bag" size={16} className="text-orange-500"/> Hàng hóa bán ra</span>
+                                                    <span className="text-2xl font-black text-slate-800">{topSellersList.reduce((sum, item) => sum + item.qty, 0)}</span>
+                                                    <span className="text-[10px] font-medium text-slate-400 mt-2">Tổng số lượng sản phẩm</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Top 10 hàng bán chạy */}
+                                            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1">
+                                                <div className="flex justify-between items-center mb-6">
+                                                    <h3 className="font-bold text-sm text-slate-800">Top 10 hàng bán chạy</h3>
+                                                    <span className="text-xs text-slate-400 font-medium">Theo doanh thu thuần</span>
+                                                </div>
+                                                
+                                                {topSellersList.length === 0 ? (
+                                                    <p className="text-center text-slate-400 text-sm mt-10">Chưa có dữ liệu bán hàng</p>
+                                                ) : (
+                                                    <div className="space-y-4">
+                                                        {topSellersList.map((item, idx) => (
+                                                            <div key={idx} className="relative">
+                                                                <div className="flex justify-between text-[11px] font-bold text-slate-700 mb-1">
+                                                                    <span>{idx + 1}. {item.name} <span className="text-slate-400 font-medium">({item.qty})</span></span>
+                                                                    <span>{item.revenue.toLocaleString()}</span>
+                                                                </div>
+                                                                <div className="w-full bg-slate-100 rounded-full h-3">
+                                                                    <div className="bg-blue-500 h-3 rounded-full transition-all duration-500" style={{ width: `${item.percent}%` }}></div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                        <div className="flex-1">
-                                            <label className="text-[10px] font-black uppercase text-slate-400 mb-1 block">Đến ngày</label>
-                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold outline-none text-slate-700" />
+
+                                        {/* Cột phải: Hoạt động gần đây */}
+                                        <div className="flex-[1] xl:min-w-[300px] bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px] xl:h-auto">
+                                            <div className="p-5 border-b border-slate-100 shrink-0">
+                                                <h3 className="font-bold text-sm text-slate-800">Hoạt động gần đây</h3>
+                                            </div>
+                                            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5">
+                                                {history.slice(0, 15).map(h => (
+                                                    <div key={h.id} className="flex gap-3 items-start relative before:absolute before:left-[11px] before:top-8 before:bottom-[-20px] before:w-0.5 before:bg-slate-100 last:before:hidden">
+                                                        <div className="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 z-10 border-2 border-white">
+                                                            <Icon name="shopping-bag" size={12}/>
+                                                        </div>
+                                                        <div className="flex-1 text-xs">
+                                                            <p className="text-slate-600 mb-0.5 leading-relaxed">
+                                                                <span className="font-bold text-blue-600">{h.seller}</span> vừa bán đơn hàng với giá trị <span className="font-bold text-emerald-600">{h.total.toLocaleString()}đ</span>
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-400 font-medium">{new Date(h.timestamp).toLocaleString('vi-VN')}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {history.length === 0 && <p className="text-xs text-slate-400 text-center">Chưa có hoạt động nào</p>}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
-                            </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                                <div className="bg-emerald-500 text-white p-5 rounded-2xl shadow-md">
-                                    <p className="text-[10px] font-black uppercase opacity-80 mb-1">Tổng Doanh thu</p>
-                                    <h2 className="text-xl md:text-2xl font-black">{reportStats.total.toLocaleString()}đ</h2>
-                                </div>
-                                <div className="bg-blue-500 text-white p-5 rounded-2xl shadow-md">
-                                    <p className="text-[10px] font-black uppercase opacity-80 mb-1">Lợi nhuận (Lãi)</p>
-                                    <h2 className="text-xl md:text-2xl font-black">{reportStats.profit.toLocaleString()}đ</h2>
-                                </div>
-                                <div className="bg-slate-800 text-white p-5 rounded-2xl shadow-md col-span-2 md:col-span-1">
-                                    <p className="text-[10px] font-black uppercase opacity-80 mb-1">Số hóa đơn</p>
-                                    <h2 className="text-xl md:text-2xl font-black">{reportStats.count}</h2>
-                                </div>
-                            </div>
+                                {/* 2. MÀN HÌNH DANH SÁCH HÓA ĐƠN */}
+                                {historyView === 'invoices' && (
+                                    <div className="flex flex-1 overflow-hidden">
+                                        {/* Cột trái: Bộ lọc tìm kiếm */}
+                                        <div className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0 overflow-y-auto custom-scrollbar">
+                                            <div className="p-4 border-b border-slate-100">
+                                                <h3 className="font-black text-xs uppercase text-slate-800">Bộ lọc</h3>
+                                            </div>
+                                            <div className="p-4 space-y-6">
+                                                <div>
+                                                    <label className="text-[11px] font-bold text-slate-600 mb-2 block">Thời gian</label>
+                                                    <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500">
+                                                        <option value="today">Hôm nay</option>
+                                                        <option value="yesterday">Hôm qua</option>
+                                                        <option value="week">Tuần này</option>
+                                                        <option value="month">Tháng này</option>
+                                                        <option value="year">Năm nay</option>
+                                                        <option value="custom">Tùy chỉnh...</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                {reportFilter === 'custom' && (
+                                                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Từ ngày</label>
+                                                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded bg-white text-xs outline-none" />
+                                                        </div>
+                                                        <div>
+                                                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Đến ngày</label>
+                                                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded bg-white text-xs outline-none" />
+                                                        </div>
+                                                    </div>
+                                                )}
 
-                            <div className="space-y-3">
-                                {filteredHistory.length === 0 ? (
-                                    <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-bold text-sm">
-                                        Chưa có dữ liệu nào trong khoảng thời gian này!
-                                    </div>
-                                ) : (
-                                    filteredHistory.map((h) => (
-                                        <div key={h.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm text-sm">
-                                            <div className="flex justify-between font-black uppercase mb-3 border-b border-slate-50 pb-2">
-                                                <span className="text-slate-700">{h.customer} <span className="text-slate-400 text-[10px] font-bold ml-1">#{h.token}</span></span>
-                                                <span className="text-emerald-600">{h.total.toLocaleString()}đ</span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 mb-3 bg-slate-50 p-2 rounded-lg font-medium">{h.items.map(i => `${i.quantity}x ${i.name}`).join(', ')}</p>
-                                            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 border-b border-slate-50 pb-3 mb-3">
-                                                <span>{new Date(h.timestamp).toLocaleString('vi-VN')}</span>
-                                                <span className="px-2 py-1 bg-slate-100 rounded text-slate-500 uppercase"><Icon name="user" size={10} className="mr-1 inline" />{h.seller}</span>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { setEditingHistoryItem(h); setShowHistoryEditModal(true); }} className="flex-1 py-2 bg-slate-100 text-slate-700 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-slate-200"><Icon name="edit-3" size={14} className="mr-1 inline"/>Sửa</button>
-                                                <button onClick={() => handleDeleteHistoryItem(h.id)} className="flex-1 py-2 bg-red-50 text-red-500 rounded-lg text-[10px] uppercase font-black transition-colors hover:bg-red-100"><Icon name="trash-2" size={14} className="mr-1 inline"/>Xóa hóa đơn</button>
+                                                <div>
+                                                    <label className="text-[11px] font-bold text-slate-600 mb-2 block">Người bán</label>
+                                                    <select value={selectedSeller} onChange={(e) => setSelectedSeller(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500">
+                                                        <option value="Tất cả">Tất cả nhân viên</option>
+                                                        {allSellers.map(name => <option key={name} value={name}>{name}</option>)}
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))
+
+                                        {/* Cột phải: Bảng dữ liệu hóa đơn */}
+                                        <div className="flex-1 bg-white flex flex-col overflow-hidden pb-24 md:pb-0">
+                                            <div className="p-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
+                                                <span className="text-xs font-bold text-slate-500">Hiển thị <span className="text-slate-800">{filteredHistory.length}</span> hóa đơn</span>
+                                                <div className="font-bold text-sm text-slate-800">Tổng: <span className="text-emerald-600">{reportStats.total.toLocaleString()}đ</span></div>
+                                            </div>
+                                            
+                                            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                                    <thead className="bg-white sticky top-0 shadow-sm border-b border-slate-200 z-10">
+                                                        <tr>
+                                                            <th className="w-10 p-3"></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Mã hóa đơn</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Thời gian</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Khách hàng</th>
+                                                            <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase text-right">Tổng tiền</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {filteredHistory.length === 0 ? (
+                                                            <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Không có dữ liệu hóa đơn.</td></tr>
+                                                        ) : (
+                                                            filteredHistory.map(h => {
+                                                                const isExpanded = expandedInvoiceId === h.id;
+                                                                return (
+                                                                    <React.Fragment key={h.id}>
+                                                                        <tr onClick={() => setExpandedInvoiceId(isExpanded ? null : h.id)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/40' : ''}`}>
+                                                                            <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
+                                                                            <td className="p-3 text-xs font-bold text-blue-600">#{h.token} <span className="text-[10px] text-slate-400 font-normal ml-1">({h.id})</span></td>
+                                                                            <td className="p-3 text-xs text-slate-600 font-medium">{new Date(h.timestamp).toLocaleString('vi-VN')}</td>
+                                                                            <td className="p-3 text-xs font-bold text-slate-700">{h.customer}</td>
+                                                                            <td className="p-3 pr-6 text-xs font-black text-right text-emerald-600">{h.total.toLocaleString()}</td>
+                                                                        </tr>
+
+                                                                        {/* Chi tiết xổ xuống của Hóa đơn */}
+                                                                        {isExpanded && (
+                                                                            <tr>
+                                                                                <td colSpan="5" className="p-0 border-b-2 border-emerald-400">
+                                                                                    <div className="bg-slate-50 p-5 shadow-inner border-t border-blue-100 relative">
+                                                                                        <div className="mb-4 flex justify-between items-start">
+                                                                                            <div>
+                                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                                    <span className="font-black text-sm text-slate-800">Hóa đơn #{h.token}</span>
+                                                                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Hoàn thành</span>
+                                                                                                </div>
+                                                                                                <div className="text-[11px] text-slate-500 flex gap-4 mt-2">
+                                                                                                    <p>Người bán: <span className="font-bold text-slate-700">{h.seller}</span></p>
+                                                                                                    <p>Giờ thanh toán: <span className="font-bold text-slate-700">{h.payTime}</span></p>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="flex gap-2">
+                                                                                                <button onClick={() => { setEditingHistoryItem(h); setShowHistoryEditModal(true); }} className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                    <Icon name="edit-3" size={14}/> Sửa
+                                                                                                </button>
+                                                                                                <button onClick={() => handleDeleteHistoryItem(h.id)} className="px-4 py-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                    <Icon name="trash-2" size={14}/> Xóa (Hoàn kho)
+                                                                                                </button>
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
+                                                                                            <table className="w-full text-left border-collapse">
+                                                                                                <thead className="bg-slate-100 border-b border-slate-200">
+                                                                                                    <tr>
+                                                                                                        <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
+                                                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Số lượng</th>
+                                                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-right w-28">Đơn giá</th>
+                                                                                                        <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-32">Thành tiền</th>
+                                                                                                    </tr>
+                                                                                                </thead>
+                                                                                                <tbody className="divide-y divide-slate-50">
+                                                                                                    {h.items.map((item, idx) => (
+                                                                                                        <tr key={idx}>
+                                                                                                            <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
+                                                                                                            <td className="p-2.5 text-xs text-slate-600 text-center font-bold">{item.quantity}</td>
+                                                                                                            <td className="p-2.5 text-xs text-slate-500 text-right">{item.price.toLocaleString()}đ</td>
+                                                                                                            <td className="p-2.5 pr-4 text-xs font-black text-right text-emerald-600">{(item.price * item.quantity).toLocaleString()}đ</td>
+                                                                                                        </tr>
+                                                                                                    ))}
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </React.Fragment>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </div>
