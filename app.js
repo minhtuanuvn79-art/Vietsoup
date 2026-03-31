@@ -289,7 +289,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [selectedCategory, setSelectedCategory] = useState('Tất cả');
     const [newCatInput, setNewCatInput] = useState('');
     const [notifications, setNotifications] = useState([]);
-    
+    const [stocktakeSearch, setStocktakeSearch] = useState(''); // Tìm kiếm trong bảng kiểm kho
+
     // Inventory Sub-tabs State
     const [inventoryTab, setInventoryTab] = useState('stock'); 
     const [importCart, setImportCart] = useState([]);
@@ -1323,52 +1324,134 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-                            {/* TAB: KIỂM KHO */}
+{/* TAB: KIỂM KHO (KIOTVIET STYLE) */}
                             {inventoryTab === 'stocktake' && (
-                                <div className="flex-1 flex flex-col h-full">
-                                    {stocktakeList.length === 0 ? (
-                                        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-2xl border border-slate-200">
-                                            <Icon name="clipboard-check" size={48} className="text-slate-300 mb-4" />
-                                            <p className="text-slate-500 font-bold text-sm mb-6 text-center px-4">Kiểm kho giúp đồng bộ số lượng hàng trên hệ thống khớp với số lượng thực tế ngoài quán.</p>
-                                            <button onClick={startStocktake} className="px-6 py-3 bg-orange-500 text-white font-black uppercase text-xs rounded-xl shadow-lg hover:bg-orange-600 transition-all">Bắt đầu phiếu kiểm kho</button>
-                                        </div>
-                                    ) : (
-                                        <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-                                            <div className="p-4 bg-slate-50 border-b border-slate-100 flex justify-between items-center shrink-0">
-                                                <h3 className="font-black text-xs uppercase text-slate-600">Phiếu kiểm kho</h3>
-                                                <button onClick={() => setStocktakeList([])} className="text-[10px] font-bold text-red-500 uppercase px-2 py-1 bg-red-50 rounded">Hủy phiếu</button>
+                                <div className="flex flex-col xl:flex-row gap-4 h-full pb-2">
+                                    {/* MAIN AREA: BẢNG KIỂM KHO */}
+                                    <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
+                                        {/* Header & Thanh tìm kiếm */}
+                                        <div className="p-4 border-b border-slate-100 flex gap-4 items-center shrink-0 bg-slate-50">
+                                            <h3 className="font-black text-sm uppercase text-slate-800 hidden md:block w-32">Phiếu kiểm kho</h3>
+                                            <div className="flex-1 relative">
+                                                <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Tìm hàng hóa trong phiếu kiểm..." 
+                                                    value={stocktakeSearch || ''}
+                                                    onChange={(e) => setStocktakeSearch(e.target.value)}
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm font-medium outline-none focus:border-emerald-500 shadow-sm"
+                                                />
                                             </div>
-                                            <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-                                                {stocktakeList.map(item => {
-                                                    const actualNum = parseFloat(item.actualStockInput) || 0;
-                                                    const diff = parseFloat((actualNum - item.stock).toFixed(2));
-                                                    return (
-                                                        <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 bg-slate-50 border border-slate-100 rounded-xl">
-                                                            <div className="flex-1 mb-2 md:mb-0">
-                                                                <h4 className="font-black text-xs uppercase text-slate-800">{item.name}</h4>
-                                                                <p className="text-[10px] font-bold text-slate-500">Tồn hệ thống: <span className="text-slate-800">{item.stock} {item.unit}</span></p>
-                                                            </div>
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-24">
-                                                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Kiểm thực tế</label>
-                                                                    <input type="number" step="0.1" value={item.actualStockInput} onChange={(e) => updateStocktake(item.id, e.target.value)} className="w-full p-2 bg-white border border-slate-200 rounded-lg text-xs font-black text-center outline-none focus:border-orange-500" />
-                                                                </div>
-                                                                <div className="w-20 text-right">
-                                                                    <label className="text-[9px] font-black uppercase text-slate-400 block mb-1">Độ lệch</label>
-                                                                    <span className={`font-black text-sm ${diff > 0 ? 'text-blue-500' : diff < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                            {stocktakeList.length === 0 && (
+                                                <button onClick={startStocktake} className="px-4 py-2.5 bg-emerald-50 text-emerald-600 border border-emerald-200 font-bold text-xs rounded-lg hover:bg-emerald-100 transition-colors whitespace-nowrap shadow-sm">
+                                                    + Tải danh sách HH
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Table danh sách */}
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar bg-white relative">
+                                            {stocktakeList.length === 0 ? (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                                                        <Icon name="clipboard-list" size={32} className="text-slate-300" />
+                                                    </div>
+                                                    <p className="font-bold text-sm text-slate-600 mb-1">Chưa có dữ liệu kiểm kho</p>
+                                                    <p className="text-xs mb-6 max-w-xs">Nhấn nút bên dưới để tải toàn bộ hàng hóa từ kho hệ thống vào phiếu kiểm.</p>
+                                                    <button onClick={startStocktake} className="px-6 py-3 bg-emerald-500 text-white font-bold text-sm uppercase rounded-xl shadow-md hover:bg-emerald-600 transition-all">Tải danh sách hàng hóa</button>
+                                                </div>
+                                            ) : (
+                                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                                    <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                                        <tr>
+                                                            <th className="p-3 pl-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Tên hàng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-24 text-center">ĐVT</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-28 text-right">Tồn hệ thống</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-36 text-right">Thực tế</th>
+                                                            <th className="p-3 pr-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-24 text-right">SL Lệch</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stocktakeList
+                                                            .filter(item => item.name.toLowerCase().includes((stocktakeSearch || '').toLowerCase()))
+                                                            .map(item => {
+                                                            const actualNum = parseFloat(item.actualStockInput) || 0;
+                                                            const diff = parseFloat((actualNum - item.stock).toFixed(2));
+                                                            return (
+                                                                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                                    <td className="p-3 pl-4 text-xs font-bold text-slate-800">{item.name}</td>
+                                                                    <td className="p-3 text-xs text-slate-500 text-center font-medium">{item.unit}</td>
+                                                                    <td className="p-3 text-xs font-bold text-slate-600 text-right">{item.stock}</td>
+                                                                    <td className="p-2.5">
+                                                                        <input 
+                                                                            type="number" step="0.1" 
+                                                                            value={item.actualStockInput} 
+                                                                            onChange={(e) => updateStocktake(item.id, e.target.value)} 
+                                                                            className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm" 
+                                                                        />
+                                                                    </td>
+                                                                    <td className={`p-3 pr-4 text-xs font-black text-right ${diff > 0 ? 'text-blue-600 bg-blue-50/50' : diff < 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-400'}`}>
                                                                         {diff > 0 ? '+' : ''}{diff}
-                                                                    </span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* SIDEBAR BÊN PHẢI: THÔNG TIN PHIẾU & ACTION */}
+                                    <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 xl:flex-none">
+                                            <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                                                <span className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5"><Icon name="user" size={14}/> Người tạo</span>
+                                                <span className="text-sm font-black text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{currentUser.name}</span>
                                             </div>
-                                            <div className="p-4 border-t border-slate-100 bg-white shrink-0">
-                                                <button onClick={handleCompleteStocktake} className="w-full py-3 bg-orange-500 text-white font-black text-xs uppercase rounded-xl shadow-lg">Cân bằng kho</button>
+                                            
+                                            <div className="mb-6">
+                                                <label className="text-[11px] font-bold uppercase text-slate-400 mb-2 block"><Icon name="edit-3" size={12} className="inline mr-1" /> Ghi chú</label>
+                                                <textarea rows="3" placeholder="Nhập ghi chú phiếu kiểm..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 resize-none shadow-sm"></textarea>
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-slate-100 pt-5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold text-slate-500">Tổng mặt hàng kiểm:</span>
+                                                    <span className="text-sm font-black text-slate-800">{stocktakeList.length}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold text-slate-500">Tổng SL thực tế:</span>
+                                                    <span className="text-sm font-black text-emerald-600">
+                                                        {stocktakeList.reduce((sum, item) => sum + (parseFloat(item.actualStockInput) || 0), 0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-orange-50 p-3 rounded-xl border border-orange-100">
+                                                    <span className="text-xs font-bold text-orange-800">Tổng SL lệch:</span>
+                                                    <span className="text-lg font-black text-orange-600">
+                                                        {stocktakeList.reduce((sum, item) => sum + Math.abs((parseFloat(item.actualStockInput) || 0) - item.stock), 0)}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
-                                    )}
+
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => {if(confirm('Bạn có chắc muốn hủy phiếu kiểm kho này?')) { setStocktakeList([]); setStocktakeSearch(''); }}} 
+                                                disabled={stocktakeList.length === 0} 
+                                                className="flex-1 py-3.5 bg-white border border-slate-200 text-red-500 disabled:text-slate-400 rounded-xl font-bold text-xs uppercase hover:bg-red-50 hover:border-red-200 transition-all shadow-sm"
+                                            >
+                                                Hủy bỏ
+                                            </button>
+                                            <button 
+                                                onClick={() => { handleCompleteStocktake(); setStocktakeSearch(''); }} 
+                                                disabled={stocktakeList.length === 0} 
+                                                className="flex-[2] py-3.5 bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs uppercase shadow-md hover:bg-emerald-600 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Icon name="check-circle" size={16}/> Cân bằng kho
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
