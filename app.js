@@ -72,13 +72,13 @@ const AppAdmin = ({ onNavigateBack }) => {
     
     const isSyncingFromCloud = useRef(false);
 
-    const syncToCloud = (currentUsers) => {
+const syncToCloud = (currentUsers) => {
         if (isSyncingFromCloud.current) return;
         setIsSyncing(true);
-        const posData = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        
+        // SỬA LỖI: Chỉ cập nhật nhánh 'users', TUYỆT ĐỐI KHÔNG ghi đè 'posData'
         db.ref('/').update({
             users: currentUsers,
-            posData: posData,
             timestamp: firebase.database.ServerValue.TIMESTAMP
         }).finally(() => setTimeout(() => setIsSyncing(false), 500));
     };
