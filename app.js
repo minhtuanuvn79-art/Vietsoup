@@ -76,7 +76,6 @@ const syncToCloud = (currentUsers) => {
         if (isSyncingFromCloud.current) return;
         setIsSyncing(true);
         
-        // SỬA LỖI: Chỉ cập nhật nhánh 'users', TUYỆT ĐỐI KHÔNG ghi đè 'posData'
         db.ref('/').update({
             users: currentUsers,
             timestamp: firebase.database.ServerValue.TIMESTAMP
@@ -196,7 +195,6 @@ const syncToCloud = (currentUsers) => {
                 </button>
             </nav>
 
-            {/* Modal Admin */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <form onSubmit={addUser} className="bg-white rounded-[2rem] w-full max-w-md p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -284,32 +282,33 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [cart, setCart] = useState([]);
     const [customerName, setCustomerName] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
-    const [inventorySearch, setInventorySearch] = useState(''); // Tìm kiếm kho
-    const [menuSearch, setMenuSearch] = useState(''); // Tìm kiếm thực đơn
+    const [inventorySearch, setInventorySearch] = useState(''); 
+    const [menuSearch, setMenuSearch] = useState(''); 
     const [selectedCategory, setSelectedCategory] = useState('Tất cả');
     const [newCatInput, setNewCatInput] = useState('');
     const [notifications, setNotifications] = useState([]);
-    const [stocktakeSearch, setStocktakeSearch] = useState(''); // Tìm kiếm trong bảng kiểm kho
+    const [stocktakeSearch, setStocktakeSearch] = useState(''); 
 
-// Inventory Sub-tabs State
+    // Inventory Sub-tabs State
     const [inventoryTab, setInventoryTab] = useState('stock'); 
     const [importCart, setImportCart] = useState([]);
     const [importSearch, setImportSearch] = useState('');
     const [stocktakeList, setStocktakeList] = useState([]);
-    const [historySubTab, setHistorySubTab] = useState('import'); // Chuyển đổi giữa Nhập hàng / Kiểm kho
-    const [expandedTransId, setExpandedTransId] = useState(null); // Quản lý việc xổ xuống chi tiết phiếu
+    const [historySubTab, setHistorySubTab] = useState('import'); 
+    const [expandedTransId, setExpandedTransId] = useState(null); 
     
-    // Các State thêm mới cho tính năng Nhập hàng nâng cao
-    const [importSupplier, setImportSupplier] = useState(''); // Nhà cung cấp
-    const [importNote, setImportNote] = useState(''); // Ghi chú nhập hàng
-    const [editingImportId, setEditingImportId] = useState(null); // ID phiếu đang sửa
+    const [importSupplier, setImportSupplier] = useState(''); 
+    const [importNote, setImportNote] = useState(''); 
+    const [editingImportId, setEditingImportId] = useState(null); 
+    
     // Report Filter States
     const [reportFilter, setReportFilter] = useState('today');
     const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
     const [selectedSeller, setSelectedSeller] = useState('Tất cả');
-    const [historyView, setHistoryView] = useState('overview'); // Chuyển đổi Tổng quan / Hóa đơn
-    const [expandedInvoiceId, setExpandedInvoiceId] = useState(null); // Quản lý xổ xuống Hóa đơn
+    const [historyView, setHistoryView] = useState('overview'); 
+    const [expandedInvoiceId, setExpandedInvoiceId] = useState(null); 
+    
     // Modal States
     const [showAddMenu, setShowAddMenu] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
@@ -318,14 +317,15 @@ const AppPOS = ({ onNavigateAdmin }) => {
     const [editingIng, setEditingIng] = useState(null);
     const [isIngSellable, setIsIngSellable] = useState(false); 
     
-    const [editingHistoryItem, setEditingHistoryItem] = useState(null);
-    const [showHistoryEditModal, setShowHistoryEditModal] = useState(false);
-    
     const [showCatModal, setShowCatModal] = useState(false);
     const [editingCat, setEditingCat] = useState({ old: '', new: '' });
     
     const [editingStockTrans, setEditingStockTrans] = useState(null);
     const [showStockTransEditModal, setShowStockTransEditModal] = useState(false);
+
+    // THÊM MỚI: State cho tính năng Trả hàng (KiotViet Style)
+    const [returnInvoice, setReturnInvoice] = useState(null);
+    const [returnItems, setReturnItems] = useState([]);
 
     // User States
     const [users, setUsers] = useState(() => {
@@ -351,7 +351,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }).catch(e => console.error("Firebase Sync Error", e));
     };
 
-    // Firebase Lắng nghe Realtime
     useEffect(() => {
         const rootRef = db.ref('/');
         rootRef.on('value', (snapshot) => {
@@ -399,8 +398,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         syncToCloud(data, users);
     }, [ingredients, products, history, orderCounter, categories, stockTransactions, users]);
-
-    const showNotification = (message, type = 'success') => {
+const showNotification = (message, type = 'success') => {
         const id = Date.now();
         setNotifications(prev => [...prev, { id, message, type }]);
         setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== id)), 4000);
@@ -423,7 +421,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setCurrentUser(null);
         localStorage.removeItem(CURRENT_USER_KEY);
     };
-// Chuẩn bị dữ liệu POS (Bán hàng)
+
+    // Chuẩn bị dữ liệu POS (Bán hàng)
     const posItems = useMemo(() => {
         const processedProducts = products.flatMap(p => {
             if (p.variants && p.variants.length > 0) {
@@ -498,7 +497,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
         });
         return { total: totalRevenue, profit: totalRevenue - totalCost, count: filteredHistory.length };
     }, [filteredHistory]);
-// Tính toán Top 10 hàng bán chạy theo Doanh thu
+
+    // Tính toán Top 10 hàng bán chạy theo Doanh thu
     const topSellersList = useMemo(() => {
         const itemMap = {};
         filteredHistory.forEach(h => {
@@ -512,6 +512,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         const maxRev = sorted[0]?.revenue || 1;
         return sorted.map(s => ({...s, percent: Math.max((s.revenue / maxRev) * 100, 5) })); // Tối thiểu 5% để dễ nhìn
     }, [filteredHistory]);
+
     const stats = useMemo(() => ({
         lowStock: ingredients.filter(i => i.stock < 5).length
     }), [ingredients]);
@@ -728,16 +729,81 @@ const AppPOS = ({ onNavigateAdmin }) => {
         showNotification('Đã xóa hóa đơn và hoàn lại kho', 'success');
     };
 
-    const saveHistoryEdit = (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const newTotal = parseFloat(fd.get('total')) || 0;
-        const newCustomer = fd.get('customer');
-        
-        setHistory(prev => prev.map(h => h.id === editingHistoryItem.id ? {...h, customer: newCustomer, total: newTotal} : h));
-        setShowHistoryEditModal(false);
-        setEditingHistoryItem(null);
-        showNotification('Cập nhật hóa đơn thành công', 'success');
+    // ==========================================
+    // LOGIC TRẢ HÀNG (KIOTVIET STYLE)
+    // ==========================================
+    const openReturnScreen = (invoice) => {
+        setReturnInvoice(invoice);
+        // Khởi tạo danh sách trả hàng với số lượng trả mặc định là 0
+        setReturnItems(invoice.items.map(item => ({
+            ...item,
+            returnQty: 0,
+            maxQty: item.quantity // Lưu lại số lượng tối đa có thể trả
+        })));
+    };
+
+    const updateReturnQty = (id, newQty, maxQty) => {
+        let qty = parseInt(newQty);
+        if (isNaN(qty) || qty < 0) qty = 0;
+        if (qty > maxQty) qty = maxQty;
+
+        setReturnItems(prev => prev.map(item => 
+            item.id === id ? { ...item, returnQty: qty } : item
+        ));
+    };
+
+    const processReturn = () => {
+        const itemsToReturn = returnItems.filter(item => item.returnQty > 0);
+        if (itemsToReturn.length === 0) {
+            showNotification("Vui lòng chọn ít nhất 1 sản phẩm để trả!", "error");
+            return;
+        }
+
+        if (!confirm('Hệ thống sẽ hoàn lại tồn kho cho các sản phẩm trả và cập nhật lại hóa đơn. Tiếp tục?')) return;
+
+        // 1. Hoàn lại số lượng vào Tồn kho
+        let updatedIngredients = [...ingredients];
+        itemsToReturn.forEach(item => {
+            if (item.type === 'retail') {
+                const idx = updatedIngredients.findIndex(ing => ing.id === item.originalId);
+                if (idx !== -1) updatedIngredients[idx].stock += item.returnQty;
+            } else if (item.recipe && item.recipe.length > 0) {
+                item.recipe.forEach(r => {
+                    const idx = updatedIngredients.findIndex(ing => Number(ing.id) === Number(r.ingId));
+                    if (idx !== -1) updatedIngredients[idx].stock += (r.amount * item.returnQty);
+                });
+            }
+        });
+        setIngredients(updatedIngredients);
+
+        // 2. Cập nhật lại hóa đơn trong History
+        setHistory(prev => {
+            let newHistory = prev.map(h => {
+                if (h.id === returnInvoice.id) {
+                    // Giảm số lượng trong hóa đơn
+                    let newInvoiceItems = h.items.map(origItem => {
+                        const rItem = itemsToReturn.find(r => r.id === origItem.id);
+                        if (rItem) {
+                            return { ...origItem, quantity: origItem.quantity - rItem.returnQty };
+                        }
+                        return origItem;
+                    }).filter(item => item.quantity > 0); // Xóa món nếu số lượng về 0
+
+                    // Tính lại tổng tiền hóa đơn
+                    const newTotal = newInvoiceItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    
+                    return { ...h, items: newInvoiceItems, total: newTotal };
+                }
+                return h;
+            });
+            // Nếu hóa đơn bị trả hết sạch món -> xóa luôn hóa đơn
+            return newHistory.filter(h => h.items.length > 0);
+        });
+
+        // 3. Reset UI
+        setReturnInvoice(null);
+        setReturnItems([]);
+        showNotification("Đã xử lý trả hàng thành công!", "success");
     };
 
     const handleDeleteIngredient = (id) => {
@@ -1031,17 +1097,18 @@ const AppPOS = ({ onNavigateAdmin }) => {
         }
         setStocktakeList(ingredients.map(i => ({ ...i, actualStockInput: String(i.stock) })));
     };
+    
     const addToStocktake = (ing) => {
         if (!stocktakeList.find(i => i.id === ing.id)) {
-            // Thêm lên đầu danh sách
             setStocktakeList([{ ...ing, actualStockInput: String(ing.stock) }, ...stocktakeList]);
         }
-        setStocktakeSearch(''); // Xóa nội dung tìm kiếm sau khi thêm
+        setStocktakeSearch(''); 
     };
 
     const removeFromStocktake = (id) => {
         setStocktakeList(prev => prev.filter(item => item.id !== id));
     };
+    
     const updateStocktake = (id, rawValue) => {
         setStocktakeList(prev => prev.map(item => item.id === id ? { ...item, actualStockInput: rawValue } : item));
     };
@@ -1112,8 +1179,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
         setEditingStockTrans(null);
         showNotification('Cập nhật phiếu thành công', 'success');
     };
-
-    // --- RENDER LOGIN ---
+// --- RENDER LOGIN ---
     if (!currentUser) {
         return (
             <div className="flex h-[100dvh] bg-[#F8FAFC] items-center justify-center p-4">
@@ -1170,6 +1236,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </header>
 
                 <div className="flex-1 flex overflow-hidden">
+                    {/* TAB BÁN HÀNG */}
                     {activeTab === 'pos' && (
                         <>
                             <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50/50 pb-40 md:pb-6">
@@ -1261,9 +1328,9 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         </>
                     )}
 
+                    {/* TAB KHO HÀNG */}
                     {activeTab === 'inventory' && (
                         <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden pb-24 md:pb-6">
-                            {/* MENU QUẢN LÝ KHO */}
                             <div className="flex gap-2 mb-4 border-b border-slate-200 pb-3 overflow-x-auto no-scrollbar shrink-0">
                                 <button onClick={() => setInventoryTab('stock')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'stock' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="database" size={14} className="mr-1 -mt-1"/>Tồn kho</button>
                                 <button onClick={() => setInventoryTab('import')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'import' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="package-plus" size={14} className="mr-1 -mt-1"/>Nhập hàng</button>
@@ -1271,7 +1338,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 <button onClick={() => setInventoryTab('history')} className={`px-4 py-2 font-black text-[10px] uppercase rounded-xl whitespace-nowrap transition-all ${inventoryTab === 'history' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 bg-slate-100 hover:bg-slate-200'}`}><Icon name="history" size={14} className="mr-1 -mt-1"/>Lịch sử kho</button>
                             </div>
 
-                            {/* TAB: TỒN KHO */}
+                            {/* SUB-TAB: TỒN KHO */}
                             {inventoryTab === 'stock' && (
                                 <div className="flex-1 overflow-y-auto custom-scrollbar">
                                     <div className="flex flex-col md:flex-row gap-2 mb-4">
@@ -1319,518 +1386,503 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             )}
 
-{/* TAB: NHẬP HÀNG (KIOTVIET STYLE - CREATE & EDIT) */}
-{inventoryTab === 'import' && (
-    <div className="flex flex-col xl:flex-row gap-4 flex-1 overflow-y-auto pb-24 md:pb-2 custom-scrollbar">
-        {/* MAIN AREA: BẢNG NHẬP HÀNG */}
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden">
-            {/* Header & Thanh tìm kiếm */}
-            <div className="p-4 border-b border-slate-100 flex gap-4 items-center shrink-0 bg-slate-50 relative">
-                <h3 className="font-black text-sm uppercase text-slate-800 hidden md:block w-32">
-                    {editingImportId ? 'Sửa phiếu nhập' : 'Phiếu nhập mới'}
-                </h3>
-                <div className="flex-1 relative">
-                    <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Tìm hàng hóa để thêm vào phiếu nhập (Nhấn Enter)..." 
-                        value={importSearch || ''}
-                        onChange={(e) => setImportSearch(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && importSearch.trim() !== '') {
-                                const match = ingredients.find(i => i.name.toLowerCase().includes(importSearch.toLowerCase()));
-                                if (match) addToImport(match);
-                            }
-                        }}
-                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
-                    />
-                    {importSearch && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
-                            {ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).length > 0 ? (
-                                ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).map(ing => (
-                                    <button 
-                                        key={ing.id} type="button" onClick={() => addToImport(ing)}
-                                        className="w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-blue-50 flex justify-between items-center font-medium text-sm text-slate-700 transition-colors"
-                                    >
-                                        <span>{ing.name} <span className="text-[10px] text-slate-400 ml-2">({ing.unit})</span></span>
-                                        <span className="text-blue-500 text-xs"><Icon name="plus-circle" size={16}/></span>
-                                    </button>
-                                ))
-                            ) : <div className="px-4 py-3 text-sm text-slate-400 text-center">Không tìm thấy hàng hóa</div>}
-                        </div>
-                    )}
-                </div>
-            </div>
-            
-            {/* Table danh sách */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar bg-white relative w-full">
-                {importCart.length === 0 ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
-                            <Icon name="package-plus" size={32} className="text-slate-300" />
-                        </div>
-                        <p className="font-bold text-sm text-slate-600 mb-1">Phiếu nhập đang trống</p>
-                        <p className="text-xs max-w-sm">Sử dụng thanh tìm kiếm phía trên để tìm và thêm nguyên liệu/hàng hóa cần nhập.</p>
-                    </div>
-                ) : (
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="p-3 pl-4 w-12 border-b border-slate-200 text-center text-[11px] text-slate-400"><Icon name="trash-2" size={14} className="mx-auto" /></th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Tên hàng</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-20 text-center">ĐVT</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-28 text-right">Số lượng</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-36 text-right">Đơn giá</th>
-                                <th className="p-3 pr-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-32 text-right">Thành tiền</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {importCart.map(item => {
-                                const currentQty = parseFloat(item.importQty) || 0;
-                                const currentPrice = parseFloat(item.importPrice) || 0;
-                                return (
-                                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="p-3 pl-4 text-center">
-                                            <button onClick={() => removeFromImport(item.id)} className="text-slate-300 hover:text-red-500 transition-colors bg-white hover:bg-red-50 p-1.5 rounded-lg"><Icon name="trash-2" size={16}/></button>
-                                        </td>
-                                        <td className="p-3 text-xs font-bold text-slate-800">{item.name}</td>
-                                        <td className="p-3 text-xs text-slate-500 text-center font-medium">{item.unit}</td>
-                                        <td className="p-2.5">
-                                            <input type="number" step="0.1" value={item.importQty} onChange={(e) => updateImportCart(item.id, 'importQty', e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-blue-500 transition-all shadow-sm" />
-                                        </td>
-                                        <td className="p-2.5">
-                                            <input type="number" value={item.importPrice} onChange={(e) => updateImportCart(item.id, 'importPrice', e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-blue-500 transition-all shadow-sm" />
-                                        </td>
-                                        <td className="p-3 pr-4 text-xs font-black text-blue-600 text-right">
-                                            {(currentQty * currentPrice).toLocaleString()}đ
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-            </div>
-        </div>
-
-        {/* SIDEBAR BÊN PHẢI: THÔNG TIN PHIẾU */}
-        <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 xl:flex-none">
-                <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
-                    <span className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5"><Icon name="user" size={14}/> Người tạo</span>
-                    <span className="text-sm font-black text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{currentUser.name}</span>
-                </div>
-                
-                <div className="space-y-4 mb-6">
-                    <div>
-                        <label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Nhà cung cấp</label>
-                        <input type="text" placeholder="Tên đối tác / NCC..." value={importSupplier} onChange={(e) => setImportSupplier(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 shadow-sm" />
-                    </div>
-                    <div>
-                        <label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Ghi chú</label>
-                        <textarea rows="3" placeholder="Nhập ghi chú..." value={importNote} onChange={(e) => setImportNote(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 resize-none shadow-sm"></textarea>
-                    </div>
-                </div>
-
-                <div className="space-y-4 border-t border-slate-100 pt-5">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500">Số lượng mặt hàng:</span>
-                        <span className="text-sm font-black text-slate-800">{importCart.length}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-blue-50 p-3 rounded-xl border border-blue-100">
-                        <span className="text-xs font-bold text-blue-800">Cần trả NCC:</span>
-                        <span className="text-xl font-black text-blue-600">
-                            {importCart.reduce((sum, item) => sum + ((parseFloat(item.importQty)||0) * (parseFloat(item.importPrice)||0)), 0).toLocaleString()}đ
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex gap-2">
-                <button onClick={clearImportForm} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-500 hover:text-red-500 rounded-xl font-bold text-xs uppercase hover:bg-red-50 hover:border-red-200 transition-all shadow-sm">
-                    Hủy bỏ
-                </button>
-                <button onClick={handleCompleteImport} disabled={importCart.length === 0} className="flex-[2] py-3.5 bg-blue-600 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs uppercase shadow-md hover:bg-blue-700 hover:shadow-lg transition-all flex items-center justify-center gap-2">
-                    <Icon name="check-circle" size={16}/> {editingImportId ? 'Lưu thay đổi' : 'Hoàn thành'}
-                </button>
-            </div>
-        </div>
-    </div>
-)}
-
-{/* TAB: KIỂM KHO (KIOTVIET STYLE - TÌM & THÊM TỪNG MÓN) */}
-{inventoryTab === 'stocktake' && (
-    <div className="flex flex-col xl:flex-row gap-4 flex-1 overflow-y-auto pb-24 md:pb-2 custom-scrollbar">
-        {/* MAIN AREA: BẢNG KIỂM KHO */}
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden">
-            
-            {/* Header & Thanh tìm kiếm tự động */}
-            <div className="p-4 border-b border-slate-100 flex gap-4 items-center shrink-0 bg-slate-50 relative">
-                <h3 className="font-black text-sm uppercase text-slate-800 hidden md:block w-32">Phiếu kiểm kho</h3>
-                
-                <div className="flex-1 relative">
-                    <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input 
-                        type="text" 
-                        placeholder="Tìm hàng hóa để thêm vào phiếu kiểm (Nhấn Enter)..." 
-                        value={stocktakeSearch || ''}
-                        onChange={(e) => setStocktakeSearch(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter' && stocktakeSearch.trim() !== '') {
-                                const match = ingredients.find(i => i.name.toLowerCase().includes(stocktakeSearch.toLowerCase()));
-                                if (match) addToStocktake(match);
-                            }
-                        }}
-                        className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm"
-                    />
-                    
-                    {/* Dropdown Gợi ý tìm kiếm */}
-                    {stocktakeSearch && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
-                            {ingredients.filter(i => i.name.toLowerCase().includes(stocktakeSearch.toLowerCase())).length > 0 ? (
-                                ingredients.filter(i => i.name.toLowerCase().includes(stocktakeSearch.toLowerCase())).map(ing => (
-                                    <button 
-                                        key={ing.id} 
-                                        type="button"
-                                        onClick={() => addToStocktake(ing)}
-                                        className="w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-emerald-50 flex justify-between items-center font-medium text-sm text-slate-700 transition-colors"
-                                    >
-                                        <span>{ing.name} <span className="text-[10px] text-slate-400 ml-2">({ing.unit})</span></span>
-                                        <span className="text-emerald-500 text-xs"><Icon name="plus-circle" size={16}/></span>
-                                    </button>
-                                ))
-                            ) : (
-                                <div className="px-4 py-3 text-sm text-slate-400 text-center">Không tìm thấy hàng hóa</div>
-                            )}
-                        </div>
-                    )}
-                </div>
-            </div>
-            
-            {/* Table danh sách */}
-            <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar bg-white relative w-full">
-                {stocktakeList.length === 0 ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
-                        <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
-                            <Icon name="search" size={32} className="text-slate-300" />
-                        </div>
-                        <p className="font-bold text-sm text-slate-600 mb-1">Phiếu kiểm đang trống</p>
-                        <p className="text-xs max-w-sm">Sử dụng thanh tìm kiếm phía trên để tìm và thêm từng mặt hàng bạn muốn kiểm kho.</p>
-                    </div>
-                ) : (
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
-                            <tr>
-                                <th className="p-3 pl-4 w-12 border-b border-slate-200 text-center text-[11px] text-slate-400"><Icon name="trash-2" size={14} className="mx-auto" /></th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Tên hàng</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-24 text-center">ĐVT</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-28 text-right">Tồn hệ thống</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-36 text-right">Thực tế</th>
-                                <th className="p-3 pr-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-24 text-right">SL Lệch</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {stocktakeList.map(item => {
-                                const actualNum = parseFloat(item.actualStockInput) || 0;
-                                const diff = parseFloat((actualNum - item.stock).toFixed(2));
-                                return (
-                                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
-                                        <td className="p-3 pl-4 text-center">
-                                            <button onClick={() => removeFromStocktake(item.id)} className="text-slate-300 hover:text-red-500 transition-colors bg-white hover:bg-red-50 p-1.5 rounded-lg"><Icon name="trash-2" size={16}/></button>
-                                        </td>
-                                        <td className="p-3 text-xs font-bold text-slate-800">{item.name}</td>
-                                        <td className="p-3 text-xs text-slate-500 text-center font-medium">{item.unit}</td>
-                                        <td className="p-3 text-xs font-bold text-slate-600 text-right">{item.stock}</td>
-                                        <td className="p-2.5">
-                                            <input 
-                                                type="number" step="0.1" 
-                                                value={item.actualStockInput} 
-                                                onChange={(e) => updateStocktake(item.id, e.target.value)} 
-                                                className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm" 
-                                            />
-                                        </td>
-                                        <td className={`p-3 pr-4 text-xs font-black text-right ${diff > 0 ? 'text-blue-600 bg-blue-50/50' : diff < 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-400'}`}>
-                                            {diff > 0 ? '+' : ''}{diff}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
-                )}
-            </div>
-        </div>
-
-        {/* SIDEBAR BÊN PHẢI: THÔNG TIN PHIẾU & ACTION */}
-        <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 xl:flex-none">
-                <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
-                    <span className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5"><Icon name="user" size={14}/> Người tạo</span>
-                    <span className="text-sm font-black text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{currentUser.name}</span>
-                </div>
-                
-                <div className="mb-6">
-                    <label className="text-[11px] font-bold uppercase text-slate-400 mb-2 block"><Icon name="edit-3" size={12} className="inline mr-1" /> Ghi chú</label>
-                    <textarea rows="3" placeholder="Nhập ghi chú phiếu kiểm..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 resize-none shadow-sm"></textarea>
-                </div>
-
-                <div className="space-y-4 border-t border-slate-100 pt-5">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500">Tổng mặt hàng kiểm:</span>
-                        <span className="text-sm font-black text-slate-800">{stocktakeList.length}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-slate-500">Tổng SL thực tế:</span>
-                        <span className="text-sm font-black text-emerald-600">
-                            {stocktakeList.reduce((sum, item) => sum + (parseFloat(item.actualStockInput) || 0), 0)}
-                        </span>
-                    </div>
-                    <div className="flex justify-between items-center bg-orange-50 p-3 rounded-xl border border-orange-100">
-                        <span className="text-xs font-bold text-orange-800">Tổng SL lệch:</span>
-                        <span className="text-lg font-black text-orange-600">
-                            {stocktakeList.reduce((sum, item) => sum + Math.abs((parseFloat(item.actualStockInput) || 0) - item.stock), 0)}
-                        </span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex gap-2">
-                <button 
-                    onClick={() => {if(confirm('Bạn có chắc muốn hủy phiếu kiểm kho này?')) { setStocktakeList([]); setStocktakeSearch(''); }}} 
-                    disabled={stocktakeList.length === 0} 
-                    className="flex-1 py-3.5 bg-white border border-slate-200 text-red-500 disabled:text-slate-400 rounded-xl font-bold text-xs uppercase hover:bg-red-50 hover:border-red-200 transition-all shadow-sm"
-                >
-                    Hủy bỏ
-                </button>
-                <button 
-                    onClick={() => { handleCompleteStocktake(); setStocktakeSearch(''); }} 
-                    disabled={stocktakeList.length === 0} 
-                    className="flex-[2] py-3.5 bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs uppercase shadow-md hover:bg-emerald-600 hover:shadow-lg transition-all flex items-center justify-center gap-2"
-                >
-                    <Icon name="check-circle" size={16}/> Cân bằng kho
-                </button>
-            </div>
-        </div>
-    </div>
-)}
-
-{/* TAB: LỊCH SỬ KHO (CHIA 2 MỤC: NHẬP HÀNG & KIỂM KHO) */}
-{inventoryTab === 'history' && (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-white rounded-2xl border border-slate-200 shadow-sm">
-        
-        {/* SUB-TABS TRONG LỊCH SỬ */}
-        <div className="flex gap-6 border-b border-slate-100 px-6 pt-3 bg-slate-50 shrink-0">
-            <button 
-                onClick={() => setHistorySubTab('import')}
-                className={`pb-3 font-black text-[11px] uppercase border-b-2 transition-all tracking-wider ${historySubTab === 'import' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            >
-                Phiếu nhập hàng
-            </button>
-            <button 
-                onClick={() => setHistorySubTab('stocktake')}
-                className={`pb-3 font-black text-[11px] uppercase border-b-2 transition-all tracking-wider ${historySubTab === 'stocktake' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            >
-                Phiếu kiểm kho
-            </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 p-4">
-            {/* 1. MỤC LỊCH SỬ NHẬP HÀNG (KIOTVIET STYLE: BẢNG & XỔ XUỐNG) */}
-            {historySubTab === 'import' && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
-                        <thead className="bg-slate-100">
-                            <tr>
-                                <th className="w-10 p-3 border-b border-slate-200"></th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Mã nhập hàng</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Thời gian</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Nhà cung cấp</th>
-                                <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Cần trả NCC</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {stockTransactions.filter(t => t.type === 'import').length === 0 ? (
-                                <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch nhập hàng nào.</td></tr>
-                            ) : (
-                                stockTransactions.filter(t => t.type === 'import').map(trans => {
-                                    const isExpanded = expandedTransId === trans.id;
-                                    return (
-                                        <React.Fragment key={trans.id}>
-                                            <tr onClick={() => setExpandedTransId(isExpanded ? null : trans.id)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/50' : ''}`}>
-                                                <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
-                                                <td className="p-3 text-xs font-bold text-blue-600">{trans.id}</td>
-                                                <td className="p-3 text-xs text-slate-600 font-medium">{new Date(trans.timestamp).toLocaleString('vi-VN')}</td>
-                                                <td className="p-3 text-xs font-bold text-slate-700">{trans.supplier || '---'}</td>
-                                                <td className="p-3 pr-6 text-xs font-black text-right text-slate-800">{trans.total?.toLocaleString()}đ</td>
-                                            </tr>
-
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td colSpan="5" className="p-0 border-b-2 border-blue-500">
-                                                        <div className="bg-slate-50 p-5 shadow-inner border-t border-blue-100 relative flex gap-6 flex-col lg:flex-row">
-                                                            <div className="flex-1 min-w-0">
-                                                                <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0">
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2 mb-1">
-                                                                            <span className="font-black text-sm text-slate-800">{trans.id}</span>
-                                                                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase">Đã nhập hàng</span>
-                                                                        </div>
-                                                                        <div className="text-[11px] text-slate-500 flex flex-wrap gap-4 mt-2">
-                                                                            <p>Người nhập: <span className="font-bold text-slate-700">{trans.seller}</span></p>
-                                                                            <p>Ngày nhập: <span className="font-bold text-slate-700">{new Date(trans.timestamp).toLocaleDateString('vi-VN')}</span></p>
-                                                                            {trans.note && <p>Ghi chú: <span className="font-bold text-slate-700">{trans.note}</span></p>}
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="flex gap-2 w-full md:w-auto">
-                                                                        <button onClick={() => loadImportForEdit(trans)} className="flex-1 md:flex-none justify-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
-                                                                            <Icon name="edit-3" size={14}/> Sửa
-                                                                        </button>
-                                                                        <button onClick={() => handleDeleteStockTrans(trans.id)} className="flex-1 md:flex-none justify-center px-3 py-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
-                                                                            <Icon name="trash-2" size={14}/> Xóa
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-
-                                                                <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto w-full">
-                                                                    <table className="w-full text-left border-collapse min-w-[400px]">
-                                                                        <thead className="bg-slate-100 border-b border-slate-200">
-                                                                            <tr>
-                                                                                <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
-                                                                                <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-20">Số lượng</th>
-                                                                                <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-right w-24">Đơn giá</th>
-                                                                                <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-28">Thành tiền</th>
-                                                                            </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-slate-50">
-                                                                            {trans.items.map((item, idx) => (
-                                                                                <tr key={idx} className="hover:bg-slate-50">
-                                                                                    <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
-                                                                                    <td className="p-2.5 text-xs text-slate-500 text-center">{item.qty}</td>
-                                                                                    <td className="p-2.5 text-xs text-slate-500 text-right">{item.price?.toLocaleString()}đ</td>
-                                                                                    <td className="p-2.5 pr-4 text-xs font-black text-right text-slate-800">{(item.qty * item.price).toLocaleString()}đ</td>
-                                                                                </tr>
-                                                                            ))}
-                                                                        </tbody>
-                                                                    </table>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    )
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-
-            {/* 2. MỤC LỊCH SỬ KIỂM KHO (KIOTVIET STYLE: BẢNG & XỔ XUỐNG) */}
-            {historySubTab === 'stocktake' && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full">
-                    <table className="w-full text-left border-collapse min-w-[600px]">
-                        <thead className="bg-slate-100">
-                            <tr>
-                                <th className="w-10 p-3 border-b border-slate-200"></th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Mã kiểm kho</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Thời gian</th>
-                                <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Tổng thực tế</th>
-                                <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Tổng chênh lệch</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {stockTransactions.filter(t => t.type === 'stocktake').length === 0 ? (
-                                <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch kiểm kho nào.</td></tr>
-                            ) : (
-                                stockTransactions.filter(t => t.type === 'stocktake').map(trans => {
-                                    const isExpanded = expandedTransId === trans.id;
-                                    const sumActual = trans.items.reduce((s, i) => s + i.newStock, 0);
-                                    const sumDiff = trans.items.reduce((s, i) => s + i.diff, 0);
-                                    
-                                    return (
-                                        <React.Fragment key={trans.id}>
-                                            {/* DÒNG TIÊU ĐỀ PHIẾU */}
-                                            <tr 
-                                                onClick={() => setExpandedTransId(isExpanded ? null : trans.id)}
-                                                className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-emerald-50/50' : ''}`}
-                                            >
-                                                <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
-                                                <td className="p-3 text-xs font-bold text-emerald-600">{trans.id}</td>
-                                                <td className="p-3 text-xs text-slate-600 font-medium">{new Date(trans.timestamp).toLocaleString('vi-VN')}</td>
-                                                <td className="p-3 text-xs font-bold text-slate-800 text-right">{sumActual}</td>
-                                                <td className={`p-3 pr-6 text-xs font-black text-right ${sumDiff > 0 ? 'text-blue-600' : sumDiff < 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                                                    {sumDiff > 0 ? '+' : ''}{sumDiff}
-                                                </td>
-                                            </tr>
-
-                                            {/* DÒNG XỔ XUỐNG - CHI TIẾT PHIẾU */}
-                                            {isExpanded && (
-                                                <tr>
-                                                    <td colSpan="5" className="p-0 border-b-2 border-emerald-500">
-                                                        <div className="bg-slate-50 p-5 shadow-inner border-t border-emerald-100 relative">
-                                                            
-                                                            {/* Thông tin Header của Phiếu */}
-                                                            <div className="mb-4 flex flex-col md:flex-row justify-between items-start gap-3 md:gap-0">
-                                                                <div>
-                                                                    <div className="flex items-center gap-2 mb-1">
-                                                                        <span className="font-black text-sm text-slate-800">{trans.id}</span>
-                                                                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Đã cân bằng kho</span>
-                                                                    </div>
-                                                                    <div className="text-[11px] text-slate-500 flex gap-4">
-                                                                        <p>Người tạo: <span className="font-bold text-slate-700">{trans.seller}</span></p>
-                                                                        <p>Ngày cân bằng: <span className="font-bold text-slate-700">{new Date(trans.timestamp).toLocaleDateString('vi-VN')}</span></p>
-                                                                    </div>
-                                                                </div>
-                                                                <button onClick={() => handleDeleteStockTrans(trans.id)} className="w-full md:w-auto justify-center px-3 py-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm mt-2 md:mt-0">
-                                                                    <Icon name="trash-2" size={14}/> Hoàn tác phiếu
+                            {/* SUB-TAB: NHẬP HÀNG */}
+                            {inventoryTab === 'import' && (
+                                <div className="flex flex-col xl:flex-row gap-4 flex-1 overflow-y-auto pb-24 md:pb-2 custom-scrollbar">
+                                    <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden">
+                                        <div className="p-4 border-b border-slate-100 flex gap-4 items-center shrink-0 bg-slate-50 relative">
+                                            <h3 className="font-black text-sm uppercase text-slate-800 hidden md:block w-32">
+                                                {editingImportId ? 'Sửa phiếu nhập' : 'Phiếu nhập mới'}
+                                            </h3>
+                                            <div className="flex-1 relative">
+                                                <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Tìm hàng hóa để thêm vào phiếu nhập (Nhấn Enter)..." 
+                                                    value={importSearch || ''}
+                                                    onChange={(e) => setImportSearch(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && importSearch.trim() !== '') {
+                                                            const match = ingredients.find(i => i.name.toLowerCase().includes(importSearch.toLowerCase()));
+                                                            if (match) addToImport(match);
+                                                        }
+                                                    }}
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all shadow-sm"
+                                                />
+                                                {importSearch && (
+                                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
+                                                        {ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).length > 0 ? (
+                                                            ingredients.filter(i => i.name.toLowerCase().includes(importSearch.toLowerCase())).map(ing => (
+                                                                <button 
+                                                                    key={ing.id} type="button" onClick={() => addToImport(ing)}
+                                                                    className="w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-blue-50 flex justify-between items-center font-medium text-sm text-slate-700 transition-colors"
+                                                                >
+                                                                    <span>{ing.name} <span className="text-[10px] text-slate-400 ml-2">({ing.unit})</span></span>
+                                                                    <span className="text-blue-500 text-xs"><Icon name="plus-circle" size={16}/></span>
                                                                 </button>
-                                                            </div>
+                                                            ))
+                                                        ) : <div className="px-4 py-3 text-sm text-slate-400 text-center">Không tìm thấy hàng hóa</div>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar bg-white relative w-full">
+                                            {importCart.length === 0 ? (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                                                        <Icon name="package-plus" size={32} className="text-slate-300" />
+                                                    </div>
+                                                    <p className="font-bold text-sm text-slate-600 mb-1">Phiếu nhập đang trống</p>
+                                                    <p className="text-xs max-w-sm">Sử dụng thanh tìm kiếm phía trên để tìm và thêm nguyên liệu/hàng hóa cần nhập.</p>
+                                                </div>
+                                            ) : (
+                                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                                    <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                                        <tr>
+                                                            <th className="p-3 pl-4 w-12 border-b border-slate-200 text-center text-[11px] text-slate-400"><Icon name="trash-2" size={14} className="mx-auto" /></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Tên hàng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-20 text-center">ĐVT</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-28 text-right">Số lượng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-36 text-right">Đơn giá</th>
+                                                            <th className="p-3 pr-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-32 text-right">Thành tiền</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {importCart.map(item => {
+                                                            const currentQty = parseFloat(item.importQty) || 0;
+                                                            const currentPrice = parseFloat(item.importPrice) || 0;
+                                                            return (
+                                                                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                                    <td className="p-3 pl-4 text-center">
+                                                                        <button onClick={() => removeFromImport(item.id)} className="text-slate-300 hover:text-red-500 transition-colors bg-white hover:bg-red-50 p-1.5 rounded-lg"><Icon name="trash-2" size={16}/></button>
+                                                                    </td>
+                                                                    <td className="p-3 text-xs font-bold text-slate-800">{item.name}</td>
+                                                                    <td className="p-3 text-xs text-slate-500 text-center font-medium">{item.unit}</td>
+                                                                    <td className="p-2.5">
+                                                                        <input type="number" step="0.1" value={item.importQty} onChange={(e) => updateImportCart(item.id, 'importQty', e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-blue-500 transition-all shadow-sm" />
+                                                                    </td>
+                                                                    <td className="p-2.5">
+                                                                        <input type="number" value={item.importPrice} onChange={(e) => updateImportCart(item.id, 'importPrice', e.target.value)} className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-blue-500 transition-all shadow-sm" />
+                                                                    </td>
+                                                                    <td className="p-3 pr-4 text-xs font-black text-blue-600 text-right">
+                                                                        {(currentQty * currentPrice).toLocaleString()}đ
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
 
-                                                            {/* Bảng chi tiết mặt hàng kiểm */}
-                                                            <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto w-full">
-                                                                <table className="w-full text-left border-collapse min-w-[400px]">
-                                                                    <thead className="bg-slate-100 border-b border-slate-200">
-                                                                        <tr>
-                                                                            <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
-                                                                            <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Tồn kho cũ</th>
-                                                                            <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Thực tế</th>
-                                                                            <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-24">SL Lệch</th>
+                                    <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 xl:flex-none">
+                                            <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                                                <span className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5"><Icon name="user" size={14}/> Người tạo</span>
+                                                <span className="text-sm font-black text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{currentUser.name}</span>
+                                            </div>
+                                            
+                                            <div className="space-y-4 mb-6">
+                                                <div>
+                                                    <label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Nhà cung cấp</label>
+                                                    <input type="text" placeholder="Tên đối tác / NCC..." value={importSupplier} onChange={(e) => setImportSupplier(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-500 shadow-sm" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] font-bold uppercase text-slate-400 mb-1.5 block">Ghi chú</label>
+                                                    <textarea rows="3" placeholder="Nhập ghi chú..." value={importNote} onChange={(e) => setImportNote(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-blue-500 resize-none shadow-sm"></textarea>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-slate-100 pt-5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold text-slate-500">Số lượng mặt hàng:</span>
+                                                    <span className="text-sm font-black text-slate-800">{importCart.length}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-blue-50 p-3 rounded-xl border border-blue-100">
+                                                    <span className="text-xs font-bold text-blue-800">Cần trả NCC:</span>
+                                                    <span className="text-xl font-black text-blue-600">
+                                                        {importCart.reduce((sum, item) => sum + ((parseFloat(item.importQty)||0) * (parseFloat(item.importPrice)||0)), 0).toLocaleString()}đ
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button onClick={clearImportForm} className="flex-1 py-3.5 bg-white border border-slate-200 text-slate-500 hover:text-red-500 rounded-xl font-bold text-xs uppercase hover:bg-red-50 hover:border-red-200 transition-all shadow-sm">
+                                                Hủy bỏ
+                                            </button>
+                                            <button onClick={handleCompleteImport} disabled={importCart.length === 0} className="flex-[2] py-3.5 bg-blue-600 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs uppercase shadow-md hover:bg-blue-700 hover:shadow-lg transition-all flex items-center justify-center gap-2">
+                                                <Icon name="check-circle" size={16}/> {editingImportId ? 'Lưu thay đổi' : 'Hoàn thành'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SUB-TAB: KIỂM KHO */}
+                            {inventoryTab === 'stocktake' && (
+                                <div className="flex flex-col xl:flex-row gap-4 flex-1 overflow-y-auto pb-24 md:pb-2 custom-scrollbar">
+                                    <div className="flex-1 bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col min-h-[400px] xl:min-h-0 overflow-hidden">
+                                        
+                                        <div className="p-4 border-b border-slate-100 flex gap-4 items-center shrink-0 bg-slate-50 relative">
+                                            <h3 className="font-black text-sm uppercase text-slate-800 hidden md:block w-32">Phiếu kiểm kho</h3>
+                                            
+                                            <div className="flex-1 relative">
+                                                <Icon name="search" size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                <input 
+                                                    type="text" 
+                                                    placeholder="Tìm hàng hóa để thêm vào phiếu kiểm (Nhấn Enter)..." 
+                                                    value={stocktakeSearch || ''}
+                                                    onChange={(e) => setStocktakeSearch(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && stocktakeSearch.trim() !== '') {
+                                                            const match = ingredients.find(i => i.name.toLowerCase().includes(stocktakeSearch.toLowerCase()));
+                                                            if (match) addToStocktake(match);
+                                                        }
+                                                    }}
+                                                    className="w-full pl-9 pr-3 py-2.5 bg-white border border-slate-300 rounded-lg text-sm font-medium outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm"
+                                                />
+                                                
+                                                {stocktakeSearch && (
+                                                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-60 overflow-y-auto custom-scrollbar">
+                                                        {ingredients.filter(i => i.name.toLowerCase().includes(stocktakeSearch.toLowerCase())).length > 0 ? (
+                                                            ingredients.filter(i => i.name.toLowerCase().includes(stocktakeSearch.toLowerCase())).map(ing => (
+                                                                <button 
+                                                                    key={ing.id} 
+                                                                    type="button"
+                                                                    onClick={() => addToStocktake(ing)}
+                                                                    className="w-full text-left px-4 py-3 border-b border-slate-50 hover:bg-emerald-50 flex justify-between items-center font-medium text-sm text-slate-700 transition-colors"
+                                                                >
+                                                                    <span>{ing.name} <span className="text-[10px] text-slate-400 ml-2">({ing.unit})</span></span>
+                                                                    <span className="text-emerald-500 text-xs"><Icon name="plus-circle" size={16}/></span>
+                                                                </button>
+                                                            ))
+                                                        ) : (
+                                                            <div className="px-4 py-3 text-sm text-slate-400 text-center">Không tìm thấy hàng hóa</div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="flex-1 overflow-y-auto overflow-x-auto custom-scrollbar bg-white relative w-full">
+                                            {stocktakeList.length === 0 ? (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 p-6 text-center">
+                                                    <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mb-4 border border-slate-100">
+                                                        <Icon name="search" size={32} className="text-slate-300" />
+                                                    </div>
+                                                    <p className="font-bold text-sm text-slate-600 mb-1">Phiếu kiểm đang trống</p>
+                                                    <p className="text-xs max-w-sm">Sử dụng thanh tìm kiếm phía trên để tìm và thêm từng mặt hàng bạn muốn kiểm kho.</p>
+                                                </div>
+                                            ) : (
+                                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                                    <thead className="bg-slate-50 sticky top-0 z-10 shadow-sm">
+                                                        <tr>
+                                                            <th className="p-3 pl-4 w-12 border-b border-slate-200 text-center text-[11px] text-slate-400"><Icon name="trash-2" size={14} className="mx-auto" /></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Tên hàng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-24 text-center">ĐVT</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-28 text-right">Tồn hệ thống</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-36 text-right">Thực tế</th>
+                                                            <th className="p-3 pr-4 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 w-24 text-right">SL Lệch</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stocktakeList.map(item => {
+                                                            const actualNum = parseFloat(item.actualStockInput) || 0;
+                                                            const diff = parseFloat((actualNum - item.stock).toFixed(2));
+                                                            return (
+                                                                <tr key={item.id} className="hover:bg-slate-50/80 transition-colors group">
+                                                                    <td className="p-3 pl-4 text-center">
+                                                                        <button onClick={() => removeFromStocktake(item.id)} className="text-slate-300 hover:text-red-500 transition-colors bg-white hover:bg-red-50 p-1.5 rounded-lg"><Icon name="trash-2" size={16}/></button>
+                                                                    </td>
+                                                                    <td className="p-3 text-xs font-bold text-slate-800">{item.name}</td>
+                                                                    <td className="p-3 text-xs text-slate-500 text-center font-medium">{item.unit}</td>
+                                                                    <td className="p-3 text-xs font-bold text-slate-600 text-right">{item.stock}</td>
+                                                                    <td className="p-2.5">
+                                                                        <input 
+                                                                            type="number" step="0.1" 
+                                                                            value={item.actualStockInput} 
+                                                                            onChange={(e) => updateStocktake(item.id, e.target.value)} 
+                                                                            className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-black text-right outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all shadow-sm" 
+                                                                        />
+                                                                    </td>
+                                                                    <td className={`p-3 pr-4 text-xs font-black text-right ${diff > 0 ? 'text-blue-600 bg-blue-50/50' : diff < 0 ? 'text-red-600 bg-red-50/50' : 'text-slate-400'}`}>
+                                                                        {diff > 0 ? '+' : ''}{diff}
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex-1 xl:flex-none">
+                                            <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-4">
+                                                <span className="text-[11px] font-bold uppercase text-slate-400 flex items-center gap-1.5"><Icon name="user" size={14}/> Người tạo</span>
+                                                <span className="text-sm font-black text-slate-800 bg-slate-100 px-3 py-1 rounded-lg">{currentUser.name}</span>
+                                            </div>
+                                            
+                                            <div className="mb-6">
+                                                <label className="text-[11px] font-bold uppercase text-slate-400 mb-2 block"><Icon name="edit-3" size={12} className="inline mr-1" /> Ghi chú</label>
+                                                <textarea rows="3" placeholder="Nhập ghi chú phiếu kiểm..." className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:border-emerald-500 resize-none shadow-sm"></textarea>
+                                            </div>
+
+                                            <div className="space-y-4 border-t border-slate-100 pt-5">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold text-slate-500">Tổng mặt hàng kiểm:</span>
+                                                    <span className="text-sm font-black text-slate-800">{stocktakeList.length}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-xs font-bold text-slate-500">Tổng SL thực tế:</span>
+                                                    <span className="text-sm font-black text-emerald-600">
+                                                        {stocktakeList.reduce((sum, item) => sum + (parseFloat(item.actualStockInput) || 0), 0)}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center bg-orange-50 p-3 rounded-xl border border-orange-100">
+                                                    <span className="text-xs font-bold text-orange-800">Tổng SL lệch:</span>
+                                                    <span className="text-lg font-black text-orange-600">
+                                                        {stocktakeList.reduce((sum, item) => sum + Math.abs((parseFloat(item.actualStockInput) || 0) - item.stock), 0)}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex gap-2">
+                                            <button 
+                                                onClick={() => {if(confirm('Bạn có chắc muốn hủy phiếu kiểm kho này?')) { setStocktakeList([]); setStocktakeSearch(''); }}} 
+                                                disabled={stocktakeList.length === 0} 
+                                                className="flex-1 py-3.5 bg-white border border-slate-200 text-red-500 disabled:text-slate-400 rounded-xl font-bold text-xs uppercase hover:bg-red-50 hover:border-red-200 transition-all shadow-sm"
+                                            >
+                                                Hủy bỏ
+                                            </button>
+                                            <button 
+                                                onClick={() => { handleCompleteStocktake(); setStocktakeSearch(''); }} 
+                                                disabled={stocktakeList.length === 0} 
+                                                className="flex-[2] py-3.5 bg-emerald-500 disabled:bg-slate-300 text-white rounded-xl font-bold text-xs uppercase shadow-md hover:bg-emerald-600 hover:shadow-lg transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Icon name="check-circle" size={16}/> Cân bằng kho
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* SUB-TAB: LỊCH SỬ KHO */}
+                            {inventoryTab === 'history' && (
+                                <div className="flex-1 flex flex-col h-full overflow-hidden bg-white rounded-2xl border border-slate-200 shadow-sm">
+                                    <div className="flex gap-6 border-b border-slate-100 px-6 pt-3 bg-slate-50 shrink-0">
+                                        <button 
+                                            onClick={() => setHistorySubTab('import')}
+                                            className={`pb-3 font-black text-[11px] uppercase border-b-2 transition-all tracking-wider ${historySubTab === 'import' ? 'border-blue-500 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            Phiếu nhập hàng
+                                        </button>
+                                        <button 
+                                            onClick={() => setHistorySubTab('stocktake')}
+                                            className={`pb-3 font-black text-[11px] uppercase border-b-2 transition-all tracking-wider ${historySubTab === 'stocktake' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+                                        >
+                                            Phiếu kiểm kho
+                                        </button>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/50 p-4">
+                                        {/* 1. MỤC LỊCH SỬ NHẬP HÀNG */}
+                                        {historySubTab === 'import' && (
+                                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full">
+                                                <table className="w-full text-left border-collapse min-w-[700px]">
+                                                    <thead className="bg-slate-100">
+                                                        <tr>
+                                                            <th className="w-10 p-3 border-b border-slate-200"></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Mã nhập hàng</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Thời gian</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Nhà cung cấp</th>
+                                                            <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Cần trả NCC</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stockTransactions.filter(t => t.type === 'import').length === 0 ? (
+                                                            <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch nhập hàng nào.</td></tr>
+                                                        ) : (
+                                                            stockTransactions.filter(t => t.type === 'import').map(trans => {
+                                                                const isExpanded = expandedTransId === trans.id;
+                                                                return (
+                                                                    <React.Fragment key={trans.id}>
+                                                                        <tr onClick={() => setExpandedTransId(isExpanded ? null : trans.id)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/50' : ''}`}>
+                                                                            <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
+                                                                            <td className="p-3 text-xs font-bold text-blue-600">{trans.id}</td>
+                                                                            <td className="p-3 text-xs text-slate-600 font-medium">{new Date(trans.timestamp).toLocaleString('vi-VN')}</td>
+                                                                            <td className="p-3 text-xs font-bold text-slate-700">{trans.supplier || '---'}</td>
+                                                                            <td className="p-3 pr-6 text-xs font-black text-right text-slate-800">{trans.total?.toLocaleString()}đ</td>
                                                                         </tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-slate-50">
-                                                                        {trans.items.map((item, idx) => (
-                                                                            <tr key={idx} className="hover:bg-slate-50">
-                                                                                <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
-                                                                                <td className="p-2.5 text-xs text-slate-500 text-center">{item.oldStock}</td>
-                                                                                <td className="p-2.5 text-xs font-bold text-slate-800 text-center bg-slate-50/50">{item.newStock}</td>
-                                                                                <td className={`p-2.5 pr-4 text-xs font-black text-right ${item.diff > 0 ? 'text-blue-500' : item.diff < 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                                                                                    {item.diff > 0 ? '+' : ''}{item.diff}
+
+                                                                        {isExpanded && (
+                                                                            <tr>
+                                                                                <td colSpan="5" className="p-0 border-b-2 border-blue-500">
+                                                                                    <div className="bg-slate-50 p-5 shadow-inner border-t border-blue-100 relative flex gap-6 flex-col lg:flex-row">
+                                                                                        <div className="flex-1 min-w-0">
+                                                                                            <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0">
+                                                                                                <div>
+                                                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                                                        <span className="font-black text-sm text-slate-800">{trans.id}</span>
+                                                                                                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold uppercase">Đã nhập hàng</span>
+                                                                                                    </div>
+                                                                                                    <div className="text-[11px] text-slate-500 flex flex-wrap gap-4 mt-2">
+                                                                                                        <p>Người nhập: <span className="font-bold text-slate-700">{trans.seller}</span></p>
+                                                                                                        <p>Ngày nhập: <span className="font-bold text-slate-700">{new Date(trans.timestamp).toLocaleDateString('vi-VN')}</span></p>
+                                                                                                        {trans.note && <p>Ghi chú: <span className="font-bold text-slate-700">{trans.note}</span></p>}
+                                                                                                    </div>
+                                                                                                </div>
+                                                                                                <div className="flex gap-2 w-full md:w-auto">
+                                                                                                    <button onClick={() => loadImportForEdit(trans)} className="flex-1 md:flex-none justify-center px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                        <Icon name="edit-3" size={14}/> Sửa
+                                                                                                    </button>
+                                                                                                    <button onClick={() => handleDeleteStockTrans(trans.id)} className="flex-1 md:flex-none justify-center px-3 py-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                        <Icon name="trash-2" size={14}/> Xóa
+                                                                                                    </button>
+                                                                                                </div>
+                                                                                            </div>
+
+                                                                                            <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto w-full">
+                                                                                                <table className="w-full text-left border-collapse min-w-[400px]">
+                                                                                                    <thead className="bg-slate-100 border-b border-slate-200">
+                                                                                                        <tr>
+                                                                                                            <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
+                                                                                                            <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-20">Số lượng</th>
+                                                                                                            <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-right w-24">Đơn giá</th>
+                                                                                                            <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-28">Thành tiền</th>
+                                                                                                        </tr>
+                                                                                                    </thead>
+                                                                                                    <tbody className="divide-y divide-slate-50">
+                                                                                                        {trans.items.map((item, idx) => (
+                                                                                                            <tr key={idx} className="hover:bg-slate-50">
+                                                                                                                <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
+                                                                                                                <td className="p-2.5 text-xs text-slate-500 text-center">{item.qty}</td>
+                                                                                                                <td className="p-2.5 text-xs text-slate-500 text-right">{item.price?.toLocaleString()}đ</td>
+                                                                                                                <td className="p-2.5 pr-4 text-xs font-black text-right text-slate-800">{(item.qty * item.price).toLocaleString()}đ</td>
+                                                                                                            </tr>
+                                                                                                        ))}
+                                                                                                    </tbody>
+                                                                                                </table>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
                                                                                 </td>
                                                                             </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </React.Fragment>
-                                    )
-                                })
+                                                                        )}
+                                                                    </React.Fragment>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+
+                                        {/* 2. MỤC LỊCH SỬ KIỂM KHO */}
+                                        {historySubTab === 'stocktake' && (
+                                            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-x-auto w-full">
+                                                <table className="w-full text-left border-collapse min-w-[600px]">
+                                                    <thead className="bg-slate-100">
+                                                        <tr>
+                                                            <th className="w-10 p-3 border-b border-slate-200"></th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Mã kiểm kho</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200">Thời gian</th>
+                                                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Tổng thực tế</th>
+                                                            <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase border-b border-slate-200 text-right">Tổng chênh lệch</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stockTransactions.filter(t => t.type === 'stocktake').length === 0 ? (
+                                                            <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Chưa có giao dịch kiểm kho nào.</td></tr>
+                                                        ) : (
+                                                            stockTransactions.filter(t => t.type === 'stocktake').map(trans => {
+                                                                const isExpanded = expandedTransId === trans.id;
+                                                                const sumActual = trans.items.reduce((s, i) => s + i.newStock, 0);
+                                                                const sumDiff = trans.items.reduce((s, i) => s + i.diff, 0);
+                                                                
+                                                                return (
+                                                                    <React.Fragment key={trans.id}>
+                                                                        <tr 
+                                                                            onClick={() => setExpandedTransId(isExpanded ? null : trans.id)}
+                                                                            className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-emerald-50/50' : ''}`}
+                                                                        >
+                                                                            <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
+                                                                            <td className="p-3 text-xs font-bold text-emerald-600">{trans.id}</td>
+                                                                            <td className="p-3 text-xs text-slate-600 font-medium">{new Date(trans.timestamp).toLocaleString('vi-VN')}</td>
+                                                                            <td className="p-3 text-xs font-bold text-slate-800 text-right">{sumActual}</td>
+                                                                            <td className={`p-3 pr-6 text-xs font-black text-right ${sumDiff > 0 ? 'text-blue-600' : sumDiff < 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                                                                                {sumDiff > 0 ? '+' : ''}{sumDiff}
+                                                                            </td>
+                                                                        </tr>
+
+                                                                        {isExpanded && (
+                                                                            <tr>
+                                                                                <td colSpan="5" className="p-0 border-b-2 border-emerald-500">
+                                                                                    <div className="bg-slate-50 p-5 shadow-inner border-t border-emerald-100 relative">
+                                                                                        <div className="mb-4 flex flex-col md:flex-row justify-between items-start gap-3 md:gap-0">
+                                                                                            <div>
+                                                                                                <div className="flex items-center gap-2 mb-1">
+                                                                                                    <span className="font-black text-sm text-slate-800">{trans.id}</span>
+                                                                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Đã cân bằng kho</span>
+                                                                                                </div>
+                                                                                                <div className="text-[11px] text-slate-500 flex gap-4">
+                                                                                                    <p>Người tạo: <span className="font-bold text-slate-700">{trans.seller}</span></p>
+                                                                                                    <p>Ngày cân bằng: <span className="font-bold text-slate-700">{new Date(trans.timestamp).toLocaleDateString('vi-VN')}</span></p>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <button onClick={() => handleDeleteStockTrans(trans.id)} className="w-full md:w-auto justify-center px-3 py-2 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm mt-2 md:mt-0">
+                                                                                                <Icon name="trash-2" size={14}/> Hoàn tác phiếu
+                                                                                            </button>
+                                                                                        </div>
+
+                                                                                        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto w-full">
+                                                                                            <table className="w-full text-left border-collapse min-w-[400px]">
+                                                                                                <thead className="bg-slate-100 border-b border-slate-200">
+                                                                                                    <tr>
+                                                                                                        <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
+                                                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Tồn kho cũ</th>
+                                                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Thực tế</th>
+                                                                                                        <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-24">SL Lệch</th>
+                                                                                                    </tr>
+                                                                                                </thead>
+                                                                                                <tbody className="divide-y divide-slate-50">
+                                                                                                    {trans.items.map((item, idx) => (
+                                                                                                        <tr key={idx} className="hover:bg-slate-50">
+                                                                                                            <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
+                                                                                                            <td className="p-2.5 text-xs text-slate-500 text-center">{item.oldStock}</td>
+                                                                                                            <td className="p-2.5 text-xs font-bold text-slate-800 text-center bg-slate-50/50">{item.newStock}</td>
+                                                                                                            <td className={`p-2.5 pr-4 text-xs font-black text-right ${item.diff > 0 ? 'text-blue-500' : item.diff < 0 ? 'text-red-500' : 'text-slate-400'}`}>
+                                                                                                                {item.diff > 0 ? '+' : ''}{item.diff}
+                                                                                                            </td>
+                                                                                                        </tr>
+                                                                                                    ))}
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                            </tr>
+                                                                        )}
+                                                                    </React.Fragment>
+                                                                )
+                                                            })
+                                                        )}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             )}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </div>
-    </div>
-)}
                         </div>
                     )}
 
+                    {/* TAB THỰC ĐƠN */}
                     {activeTab === 'menu' && (
                         <div className="flex-1 p-4 md:p-6 overflow-y-auto pb-24 md:pb-6">
                             <div className="flex flex-col md:flex-row gap-2 mb-4">
@@ -1896,11 +1948,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
                         </div>
                     )}
 
-{/* TAB BÁO CÁO (KIOTVIET STYLE: TỔNG QUAN & HÓA ĐƠN) */}
+                    {/* TAB BÁO CÁO */}
                     {activeTab === 'history' && (
                         <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-50">
                             
-                            {/* SUB-TABS: Tổng quan / Hóa đơn */}
                             <div className="flex gap-6 border-b border-slate-200 px-6 pt-4 bg-white shrink-0 shadow-sm z-10">
                                 <button 
                                     onClick={() => setHistoryView('overview')}
@@ -1918,12 +1969,10 @@ const AppPOS = ({ onNavigateAdmin }) => {
 
                             <div className="flex-1 overflow-hidden flex">
                                 
-                                {/* 1. MÀN HÌNH TỔNG QUAN (DASHBOARD) */}
+                                {/* 1. MÀN HÌNH TỔNG QUAN */}
                                 {historyView === 'overview' && (
                                     <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-6 pb-24 flex flex-col xl:flex-row gap-6">
-                                        {/* Cột trái: Thống kê & Biểu đồ */}
                                         <div className="flex-[3] flex flex-col gap-6">
-                                            {/* Bộ lọc nhanh cho Tổng quan */}
                                             <div className="flex justify-end gap-3">
                                                 <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="p-2.5 bg-white border border-slate-200 rounded-lg text-xs font-bold outline-none shadow-sm min-w-[150px]">
                                                     <option value="today">Hôm nay</option>
@@ -1941,7 +1990,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 )}
                                             </div>
 
-                                            {/* Box KPI */}
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                 <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col">
                                                     <span className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5"><Icon name="dollar-sign" size={16} className="text-emerald-500"/> Doanh thu</span>
@@ -1960,7 +2008,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                             </div>
 
-                                            {/* Top 10 hàng bán chạy */}
                                             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex-1">
                                                 <div className="flex justify-between items-center mb-6">
                                                     <h3 className="font-bold text-sm text-slate-800">Top 10 hàng bán chạy</h3>
@@ -1987,7 +2034,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                             </div>
                                         </div>
 
-                                        {/* Cột phải: Hoạt động gần đây */}
                                         <div className="flex-[1] xl:min-w-[300px] bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col h-[500px] xl:h-auto">
                                             <div className="p-5 border-b border-slate-100 shrink-0">
                                                 <h3 className="font-bold text-sm text-slate-800">Hoạt động gần đây</h3>
@@ -2012,149 +2058,233 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     </div>
                                 )}
 
-{/* 2. MÀN HÌNH DANH SÁCH HÓA ĐƠN */}
-{historyView === 'invoices' && (
-    <div className="flex flex-1 overflow-hidden">
-        {/* Cột trái: Bộ lọc tìm kiếm */}
-        <div className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0 overflow-y-auto custom-scrollbar">
-            <div className="p-4 border-b border-slate-100">
-                <h3 className="font-black text-xs uppercase text-slate-800">Bộ lọc</h3>
-            </div>
-            <div className="p-4 space-y-6">
-                <div>
-                    <label className="text-[11px] font-bold text-slate-600 mb-2 block">Thời gian</label>
-                    <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500">
-                        <option value="today">Hôm nay</option>
-                        <option value="yesterday">Hôm qua</option>
-                        <option value="week">Tuần này</option>
-                        <option value="month">Tháng này</option>
-                        <option value="year">Năm nay</option>
-                        <option value="custom">Tùy chỉnh...</option>
-                    </select>
-                </div>
-                
-                {reportFilter === 'custom' && (
-                    <div className="space-y-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                        <div>
-                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Từ ngày</label>
-                            <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded bg-white text-xs outline-none" />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-bold text-slate-500 block mb-1">Đến ngày</label>
-                            <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded bg-white text-xs outline-none" />
-                        </div>
-                    </div>
-                )}
-
-                <div>
-                    <label className="text-[11px] font-bold text-slate-600 mb-2 block">Người bán</label>
-                    <select value={selectedSeller} onChange={(e) => setSelectedSeller(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500">
-                        <option value="Tất cả">Tất cả nhân viên</option>
-                        {allSellers.map(name => <option key={name} value={name}>{name}</option>)}
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        {/* Cột phải: Bảng dữ liệu hóa đơn */}
-        <div className="flex-1 bg-white flex flex-col overflow-hidden pb-24 md:pb-0">
-            <div className="p-3 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center shrink-0 gap-2">
-                <span className="text-xs font-bold text-slate-500">Hiển thị <span className="text-slate-800">{filteredHistory.length}</span> hóa đơn</span>
-                <div className="font-bold text-sm text-slate-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 w-full md:w-auto flex justify-between md:inline-block">
-                    <span className="md:hidden text-emerald-800 text-xs mt-0.5">Tổng cộng:</span>
-                    <span className="text-emerald-600">{reportStats.total.toLocaleString()}đ</span>
-                </div>
-            </div>
-            
-            <div className="flex-1 overflow-auto overflow-x-auto custom-scrollbar w-full">
-                <table className="w-full text-left border-collapse min-w-[700px]">
-                    <thead className="bg-white sticky top-0 shadow-sm border-b border-slate-200 z-10">
-                        <tr>
-                            <th className="w-10 p-3"></th>
-                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Mã hóa đơn</th>
-                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Thời gian</th>
-                            <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Khách hàng</th>
-                            <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase text-right">Tổng tiền</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {filteredHistory.length === 0 ? (
-                            <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Không có dữ liệu hóa đơn.</td></tr>
-                        ) : (
-                            filteredHistory.map(h => {
-                                const isExpanded = expandedInvoiceId === h.id;
-                                return (
-                                    <React.Fragment key={h.id}>
-                                        <tr onClick={() => setExpandedInvoiceId(isExpanded ? null : h.id)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/40' : ''}`}>
-                                            <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
-                                            <td className="p-3 text-xs font-bold text-blue-600">#{h.token} <span className="text-[10px] text-slate-400 font-normal ml-1">({h.id})</span></td>
-                                            <td className="p-3 text-xs text-slate-600 font-medium">{new Date(h.timestamp).toLocaleString('vi-VN')}</td>
-                                            <td className="p-3 text-xs font-bold text-slate-700">{h.customer}</td>
-                                            <td className="p-3 pr-6 text-xs font-black text-right text-emerald-600">{h.total.toLocaleString()}</td>
-                                        </tr>
-
-                                        {/* Chi tiết xổ xuống của Hóa đơn */}
-                                        {isExpanded && (
-                                            <tr>
-                                                <td colSpan="5" className="p-0 border-b-2 border-emerald-400">
-                                                    <div className="bg-slate-50 p-5 shadow-inner border-t border-blue-100 relative">
-                                                        <div className="mb-4 flex flex-col md:flex-row justify-between items-start gap-3 md:gap-0">
-                                                            <div>
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    <span className="font-black text-sm text-slate-800">Hóa đơn #{h.token}</span>
-                                                                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Hoàn thành</span>
-                                                                </div>
-                                                                <div className="text-[11px] text-slate-500 flex gap-4 mt-2">
-                                                                    <p>Người bán: <span className="font-bold text-slate-700">{h.seller}</span></p>
-                                                                    <p>Giờ thanh toán: <span className="font-bold text-slate-700">{h.payTime}</span></p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
-                                                                <button onClick={() => { setEditingHistoryItem(h); setShowHistoryEditModal(true); }} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
-                                                                    <Icon name="edit-3" size={14}/> Sửa
-                                                                </button>
-                                                                <button onClick={() => handleDeleteHistoryItem(h.id)} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
-                                                                    <Icon name="trash-2" size={14}/> Hoàn kho
-                                                                </button>
-                                                            </div>
-                                                        </div>
-
-                                                        <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto w-full">
-                                                            <table className="w-full text-left border-collapse min-w-[400px]">
-                                                                <thead className="bg-slate-100 border-b border-slate-200">
-                                                                    <tr>
-                                                                        <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
-                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Số lượng</th>
-                                                                        <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-right w-28">Đơn giá</th>
-                                                                        <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-32">Thành tiền</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody className="divide-y divide-slate-50">
-                                                                    {h.items.map((item, idx) => (
-                                                                        <tr key={idx}>
-                                                                            <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
-                                                                            <td className="p-2.5 text-xs text-slate-600 text-center font-bold">{item.quantity}</td>
-                                                                            <td className="p-2.5 text-xs text-slate-500 text-right">{item.price.toLocaleString()}đ</td>
-                                                                            <td className="p-2.5 pr-4 text-xs font-black text-right text-emerald-600">{(item.price * item.quantity).toLocaleString()}đ</td>
-                                                                        </tr>
-                                                                    ))}
-                                                                </tbody>
-                                                            </table>
+                                {/* 2. MÀN HÌNH DANH SÁCH HÓA ĐƠN & TRẢ HÀNG */}
+                                {historyView === 'invoices' && (
+                                    <div className="flex flex-1 overflow-hidden">
+                                        
+                                        {/* GIAO DIỆN TRẢ HÀNG (KIOTVIET STYLE) */}
+                                        {returnInvoice ? (
+                                            <div className="flex flex-col xl:flex-row gap-4 flex-1 p-4 bg-slate-100 overflow-y-auto w-full slide-up-anim">
+                                                <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
+                                                    <div className="p-4 bg-rose-50 border-b border-rose-100 flex justify-between items-center shrink-0">
+                                                        <div className="flex items-center gap-3">
+                                                            <button onClick={() => setReturnInvoice(null)} className="p-2 bg-white rounded-lg text-slate-500 hover:text-slate-800 shadow-sm"><Icon name="arrow-left" size={20}/></button>
+                                                            <h3 className="font-black text-rose-600 text-lg uppercase italic">Phiếu Trả Hàng / HD: #{returnInvoice.token}</h3>
                                                         </div>
                                                     </div>
-                                                </td>
-                                            </tr>
+                                                    
+                                                    <div className="flex-1 overflow-y-auto custom-scrollbar w-full">
+                                                        <table className="w-full text-left border-collapse min-w-[500px]">
+                                                            <thead className="bg-slate-50 sticky top-0 shadow-sm border-b border-slate-200 z-10">
+                                                                <tr>
+                                                                    <th className="p-3 text-[11px] font-bold text-slate-500 uppercase pl-6">Mã hàng / Tên món</th>
+                                                                    <th className="p-3 text-[11px] font-bold text-slate-500 uppercase text-center w-40">SL Trả / Tổng Mua</th>
+                                                                    <th className="p-3 text-[11px] font-bold text-slate-500 uppercase text-right w-28">Đơn giá</th>
+                                                                    <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase text-right w-32">Tiền trả lại</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100">
+                                                                {returnItems.map(item => (
+                                                                    <tr key={item.id} className={`hover:bg-slate-50 transition-colors ${item.returnQty > 0 ? 'bg-rose-50/30' : ''}`}>
+                                                                        <td className="p-4 pl-6 text-sm font-bold text-slate-800">{item.name}</td>
+                                                                        <td className="p-4 flex items-center justify-center gap-2">
+                                                                            <input 
+                                                                                type="number" 
+                                                                                value={item.returnQty === 0 ? '' : item.returnQty} 
+                                                                                placeholder="0"
+                                                                                onChange={(e) => updateReturnQty(item.id, e.target.value, item.maxQty)}
+                                                                                className="w-16 p-2 text-center text-rose-600 font-black border border-slate-300 rounded-lg outline-none focus:border-rose-500"
+                                                                            />
+                                                                            <span className="text-slate-400 font-bold">/ {item.maxQty}</span>
+                                                                        </td>
+                                                                        <td className="p-4 text-sm text-slate-500 text-right font-medium">{item.price.toLocaleString()}</td>
+                                                                        <td className="p-4 pr-6 text-sm font-black text-right text-rose-600">{(item.price * item.returnQty).toLocaleString()}</td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+
+                                                <div className="w-full xl:w-80 flex flex-col gap-4 shrink-0">
+                                                    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+                                                        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                                                            <div className="bg-slate-100 p-3 rounded-full text-slate-500"><Icon name="user" size={20}/></div>
+                                                            <div>
+                                                                <p className="text-[11px] font-bold text-slate-400 uppercase">Khách hàng</p>
+                                                                <p className="font-black text-slate-800">{returnInvoice.customer || 'Khách lẻ'}</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="space-y-4 text-sm">
+                                                            <div className="flex justify-between items-center text-slate-500 font-medium">
+                                                                <span>Tổng giá hàng mua</span>
+                                                                <span>{returnInvoice.total.toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="flex justify-between items-center font-bold text-slate-700">
+                                                                <span>Tổng tiền hàng trả ({returnItems.reduce((sum, i) => sum + i.returnQty, 0)} món)</span>
+                                                                <span>{returnItems.reduce((sum, item) => sum + (item.price * item.returnQty), 0).toLocaleString()}</span>
+                                                            </div>
+                                                            <div className="w-full h-px bg-slate-200 border-dashed border-t border-slate-300 my-2"></div>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-bold text-rose-600 text-base">Cần trả khách</span>
+                                                                <span className="font-black text-rose-600 text-2xl">{returnItems.reduce((sum, item) => sum + (item.price * item.returnQty), 0).toLocaleString()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <button 
+                                                        onClick={processReturn}
+                                                        disabled={returnItems.reduce((sum, i) => sum + i.returnQty, 0) === 0}
+                                                        className="w-full py-4 bg-rose-500 hover:bg-rose-600 disabled:bg-slate-300 text-white rounded-xl font-black text-sm uppercase shadow-lg transition-all"
+                                                    >
+                                                        Trả Hàng
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <>
+                                                {/* DANH SÁCH HÓA ĐƠN GỐC */}
+                                                <div className="hidden md:flex w-64 bg-white border-r border-slate-200 flex-col shrink-0 overflow-y-auto custom-scrollbar">
+                                                    <div className="p-4 border-b border-slate-100">
+                                                        <h3 className="font-black text-xs uppercase text-slate-800">Bộ lọc</h3>
+                                                    </div>
+                                                    <div className="p-4 space-y-6">
+                                                        <div>
+                                                            <label className="text-[11px] font-bold text-slate-600 mb-2 block">Thời gian</label>
+                                                            <select value={reportFilter} onChange={(e) => setReportFilter(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500">
+                                                                <option value="today">Hôm nay</option>
+                                                                <option value="yesterday">Hôm qua</option>
+                                                                <option value="week">Tuần này</option>
+                                                                <option value="month">Tháng này</option>
+                                                                <option value="year">Năm nay</option>
+                                                                <option value="custom">Tùy chỉnh...</option>
+                                                            </select>
+                                                        </div>
+                                                        
+                                                        {reportFilter === 'custom' && (
+                                                            <div className="space-y-3 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                                                                <div>
+                                                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Từ ngày</label>
+                                                                    <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded bg-white text-xs outline-none" />
+                                                                </div>
+                                                                <div>
+                                                                    <label className="text-[10px] font-bold text-slate-500 block mb-1">Đến ngày</label>
+                                                                    <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full p-2 border border-slate-200 rounded bg-white text-xs outline-none" />
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        <div>
+                                                            <label className="text-[11px] font-bold text-slate-600 mb-2 block">Người bán</label>
+                                                            <select value={selectedSeller} onChange={(e) => setSelectedSeller(e.target.value)} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-blue-500">
+                                                                <option value="Tất cả">Tất cả nhân viên</option>
+                                                                {allSellers.map(name => <option key={name} value={name}>{name}</option>)}
+                                                            </select>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex-1 bg-white flex flex-col overflow-hidden pb-24 md:pb-0">
+                                                    <div className="p-3 bg-slate-50 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center shrink-0 gap-2">
+                                                        <span className="text-xs font-bold text-slate-500">Hiển thị <span className="text-slate-800">{filteredHistory.length}</span> hóa đơn</span>
+                                                        <div className="font-bold text-sm text-slate-800 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 w-full md:w-auto flex justify-between md:inline-block">
+                                                            <span className="md:hidden text-emerald-800 text-xs mt-0.5">Tổng cộng:</span>
+                                                            <span className="text-emerald-600">{reportStats.total.toLocaleString()}đ</span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex-1 overflow-auto overflow-x-auto custom-scrollbar w-full">
+                                                        <table className="w-full text-left border-collapse min-w-[700px]">
+                                                            <thead className="bg-white sticky top-0 shadow-sm border-b border-slate-200 z-10">
+                                                                <tr>
+                                                                    <th className="w-10 p-3"></th>
+                                                                    <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Mã hóa đơn</th>
+                                                                    <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Thời gian</th>
+                                                                    <th className="p-3 text-[11px] font-bold text-slate-500 uppercase">Khách hàng</th>
+                                                                    <th className="p-3 pr-6 text-[11px] font-bold text-slate-500 uppercase text-right">Tổng tiền</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody className="divide-y divide-slate-100">
+                                                                {filteredHistory.length === 0 ? (
+                                                                    <tr><td colSpan="5" className="text-center py-10 text-slate-400 font-bold text-sm">Không có dữ liệu hóa đơn.</td></tr>
+                                                                ) : (
+                                                                    filteredHistory.map(h => {
+                                                                        const isExpanded = expandedInvoiceId === h.id;
+                                                                        return (
+                                                                            <React.Fragment key={h.id}>
+                                                                                <tr onClick={() => setExpandedInvoiceId(isExpanded ? null : h.id)} className={`cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/40' : ''}`}>
+                                                                                    <td className="p-3 pl-4 text-slate-400"><Icon name={isExpanded ? "chevron-down" : "chevron-right"} size={16} /></td>
+                                                                                    <td className="p-3 text-xs font-bold text-blue-600">#{h.token} <span className="text-[10px] text-slate-400 font-normal ml-1">({h.id})</span></td>
+                                                                                    <td className="p-3 text-xs text-slate-600 font-medium">{new Date(h.timestamp).toLocaleString('vi-VN')}</td>
+                                                                                    <td className="p-3 text-xs font-bold text-slate-700">{h.customer}</td>
+                                                                                    <td className="p-3 pr-6 text-xs font-black text-right text-emerald-600">{h.total.toLocaleString()}</td>
+                                                                                </tr>
+
+                                                                                {isExpanded && (
+                                                                                    <tr>
+                                                                                        <td colSpan="5" className="p-0 border-b-2 border-emerald-400">
+                                                                                            <div className="bg-slate-50 p-5 shadow-inner border-t border-blue-100 relative">
+                                                                                                <div className="mb-4 flex flex-col md:flex-row justify-between items-start gap-3 md:gap-0">
+                                                                                                    <div>
+                                                                                                        <div className="flex items-center gap-2 mb-1">
+                                                                                                            <span className="font-black text-sm text-slate-800">Hóa đơn #{h.token}</span>
+                                                                                                            <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold uppercase">Hoàn thành</span>
+                                                                                                        </div>
+                                                                                                        <div className="text-[11px] text-slate-500 flex gap-4 mt-2">
+                                                                                                            <p>Người bán: <span className="font-bold text-slate-700">{h.seller}</span></p>
+                                                                                                            <p>Giờ thanh toán: <span className="font-bold text-slate-700">{h.payTime}</span></p>
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                    <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
+                                                                                                        <button onClick={() => openReturnScreen(h)} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-rose-500 text-white hover:bg-rose-600 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                            <Icon name="corner-up-left" size={14}/> Trả hàng / Sửa
+                                                                                                        </button>
+                                                                                                        
+                                                                                                        <button onClick={() => handleDeleteHistoryItem(h.id)} className="flex-1 md:flex-none justify-center px-4 py-2.5 bg-white border border-red-200 text-red-500 hover:bg-red-50 rounded-lg text-[10px] uppercase font-black transition-colors flex items-center gap-1 shadow-sm">
+                                                                                                            <Icon name="trash-2" size={14}/> Xóa Hóa Đơn
+                                                                                                        </button>
+                                                                                                    </div>
+                                                                                                </div>
+
+                                                                                                <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-x-auto w-full">
+                                                                                                    <table className="w-full text-left border-collapse min-w-[400px]">
+                                                                                                        <thead className="bg-slate-100 border-b border-slate-200">
+                                                                                                            <tr>
+                                                                                                                <th className="p-2.5 pl-4 text-[10px] font-bold text-slate-500 uppercase">Tên hàng</th>
+                                                                                                                <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-center w-24">Số lượng</th>
+                                                                                                                <th className="p-2.5 text-[10px] font-bold text-slate-500 uppercase text-right w-28">Đơn giá</th>
+                                                                                                                <th className="p-2.5 pr-4 text-[10px] font-bold text-slate-500 uppercase text-right w-32">Thành tiền</th>
+                                                                                                            </tr>
+                                                                                                        </thead>
+                                                                                                        <tbody className="divide-y divide-slate-50">
+                                                                                                            {h.items.map((item, idx) => (
+                                                                                                                <tr key={idx}>
+                                                                                                                    <td className="p-2.5 pl-4 text-xs font-bold text-slate-700">{item.name}</td>
+                                                                                                                    <td className="p-2.5 text-xs text-slate-600 text-center font-bold">{item.quantity}</td>
+                                                                                                                    <td className="p-2.5 text-xs text-slate-500 text-right">{item.price.toLocaleString()}đ</td>
+                                                                                                                    <td className="p-2.5 pr-4 text-xs font-black text-right text-emerald-600">{(item.price * item.quantity).toLocaleString()}đ</td>
+                                                                                                                </tr>
+                                                                                                            ))}
+                                                                                                        </tbody>
+                                                                                                    </table>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                )}
+                                                                            </React.Fragment>
+                                                                        )
+                                                                    })
+                                                                )}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                </div>
+                                            </>
                                         )}
-                                    </React.Fragment>
-                                )
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-)}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )}
@@ -2191,7 +2321,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
                     </button>
                 )}
             </nav>
-{/* MODAL GIỎ HÀNG MOBILE ĐỂ CHỈNH SỬA SỐ LƯỢNG VÀ XÓA */}
+
+            {/* MODAL GIỎ HÀNG MOBILE */}
             {showMobileCart && (
                 <div className="md:hidden fixed inset-0 bg-white z-[100] flex flex-col slide-up-anim">
                     <div className="p-4 bg-[#0F172A] text-white flex justify-between items-center shrink-0 pt-safe">
@@ -2237,27 +2368,22 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL THÔNG TIN HÀNG HÓA KHO (KIOTVIET STYLE) */}
+            {/* MODAL THÔNG TIN HÀNG HÓA KHO */}
             {showIngModal && (
                 <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-sm">
                     <form onSubmit={handleIngSubmit} className="bg-white rounded-xl w-full max-w-4xl flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden shadow-2xl">
                         
-                        {/* Modal Header */}
                         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
                             <h3 className="text-lg font-bold text-slate-800">{editingIng ? 'Sửa hàng hóa' : 'Thêm hàng hóa mới'}</h3>
                             <button type="button" onClick={() => setShowIngModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
                         </div>
 
-                        {/* Tabs */}
                         <div className="flex px-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
                             <button type="button" className="px-4 py-3 text-sm font-bold text-emerald-600 border-b-2 border-emerald-600">Thông tin</button>
                             <button type="button" className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">Mô tả</button>
                         </div>
 
-                        {/* Modal Body */}
                         <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 custom-scrollbar">
-                            
-                            {/* Block 1: Thông tin cơ bản & Ảnh */}
                             <div className="flex flex-col md:flex-row gap-6 mb-6">
                                 <div className="flex-1 space-y-4">
                                     <div>
@@ -2278,7 +2404,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     </div>
                                 </div>
                                 
-                                {/* Image Upload Area */}
                                 <div className="w-full md:w-48 shrink-0">
                                     <div className="border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center h-32 md:h-full min-h-[140px] text-slate-400 cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-500 transition-all">
                                         <Icon name="image-plus" size={28} className="mb-2"/>
@@ -2288,7 +2413,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* Block 2: Giá vốn, giá bán */}
                             <div className="bg-white p-5 rounded-xl border border-slate-200 mb-6 shadow-sm">
                                 <div className="flex items-center justify-between mb-4 cursor-pointer">
                                     <h4 className="font-bold text-sm text-slate-800">Giá vốn, giá bán</h4>
@@ -2315,7 +2439,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* Block 3: Tồn kho */}
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                 <div className="flex items-center justify-between mb-4 cursor-pointer">
                                     <h4 className="font-bold text-sm text-slate-800">Tồn kho</h4>
@@ -2328,10 +2451,8 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     </div>
                                 </div>
                             </div>
-
                         </div>
 
-                        {/* Modal Footer (Action Bar) */}
                         <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex flex-col-reverse md:flex-row justify-between items-center gap-4 rounded-b-xl">
                             <label className="flex items-center gap-2 cursor-pointer w-full md:w-auto p-2 md:p-0 rounded-lg hover:bg-slate-50 transition-colors">
                                 <input type="checkbox" name="isSellable" checked={isIngSellable} onChange={(e) => setIsIngSellable(e.target.checked)} className="w-4 h-4 accent-emerald-500 rounded cursor-pointer" />
@@ -2347,27 +2468,21 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN KÈM RECIPE (KIOTVIET STYLE) */}
+            {/* MODAL THÊM/SỬA MÓN THỰC ĐƠN */}
             {showAddMenu && (
                 <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 md:p-8 backdrop-blur-sm">
                     <form onSubmit={handleProductSubmit} className="bg-white rounded-xl w-full max-w-5xl flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] overflow-hidden shadow-2xl">
-                        
-                        {/* Modal Header */}
                         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
                             <h3 className="text-lg font-bold text-slate-800">{editingProduct ? 'Sửa thông tin món' : 'Thêm món mới'}</h3>
                             <button type="button" onClick={() => setShowAddMenu(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
                         </div>
 
-                        {/* Tabs */}
                         <div className="flex px-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
                             <button type="button" className="px-4 py-3 text-sm font-bold text-emerald-600 border-b-2 border-emerald-600">Thông tin</button>
                             <button type="button" className="px-4 py-3 text-sm font-medium text-slate-500 hover:text-slate-700">Mô tả</button>
                         </div>
 
-                        {/* Modal Body */}
                         <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50 custom-scrollbar">
-                            
-                            {/* Block 1: Thông tin cơ bản & Ảnh */}
                             <div className="flex flex-col md:flex-row gap-6 mb-6">
                                 <div className="flex-1 space-y-4">
                                     <div>
@@ -2382,7 +2497,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                     </div>
                                 </div>
                                 
-                                {/* Image/Icon Input */}
                                 <div className="w-full md:w-48 shrink-0">
                                     <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Icon/Emoji hiển thị</label>
                                     <div className="border-2 border-dashed border-slate-300 rounded-xl bg-white flex flex-col items-center justify-center h-28 text-slate-400 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500 transition-all overflow-hidden relative cursor-pointer hover:bg-emerald-50 hover:border-emerald-300">
@@ -2391,7 +2505,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                 </div>
                             </div>
 
-                            {/* Block 2: Thuộc tính & Định mức */}
                             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                                 <div className="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                                     <h4 className="font-bold text-sm text-slate-800">Thuộc tính (Size), Giá bán & Định mức</h4>
@@ -2426,13 +2539,11 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                 </div>
                                             </div>
 
-{/* Định mức nguyên liệu */}
                                             <div className="bg-white p-3 rounded-lg border border-slate-200">
                                                 <div className="flex justify-between items-center mb-3">
                                                     <span className="text-[12px] font-bold text-slate-700 flex items-center gap-1.5"><Icon name="database" size={14} className="text-slate-400"/> Định mức nguyên liệu (Trừ kho)</span>
                                                 </div>
                                                 
-                                                {/* THANH TÌM KIẾM NGUYÊN LIỆU MỚI */}
                                                 <div className="relative mb-3">
                                                     <Icon name="search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                                                     <input 
@@ -2443,7 +2554,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                         className="w-full pl-8 pr-3 py-2 text-xs font-medium border border-slate-300 bg-slate-50 rounded-lg outline-none focus:border-emerald-500 transition-all"
                                                     />
                                                     
-                                                    {/* Dropdown kết quả tìm kiếm */}
                                                     {v.ingSearch && (
                                                         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-20 max-h-40 overflow-y-auto custom-scrollbar">
                                                             {ingredients.filter(i => i.name.toLowerCase().includes(v.ingSearch.toLowerCase())).length > 0 ? (
@@ -2453,7 +2563,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                                         type="button"
                                                                         onClick={() => {
                                                                             addSpecificRecipeItem(idx, ing.id);
-                                                                            updateVariant(idx, 'ingSearch', ''); // Xóa ô tìm kiếm sau khi chọn
+                                                                            updateVariant(idx, 'ingSearch', '');
                                                                         }}
                                                                         className="w-full text-left px-3 py-2.5 text-xs hover:bg-emerald-50 hover:text-emerald-600 font-medium border-b border-slate-50 last:border-0 flex justify-between items-center"
                                                                     >
@@ -2468,7 +2578,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                                                     )}
                                                 </div>
                                                 
-                                                {/* DANH SÁCH NGUYÊN LIỆU ĐÃ CHỌN (Gọn gàng hơn) */}
                                                 {v.recipe && v.recipe.length > 0 ? (
                                                     <div className="space-y-2 border-t border-slate-100 pt-3">
                                                         {v.recipe.map((r, rIdx) => {
@@ -2502,7 +2611,6 @@ const AppPOS = ({ onNavigateAdmin }) => {
                             </div>
                         </div>
 
-                        {/* Modal Footer (Action Bar) */}
                         <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3 rounded-b-xl">
                             <button type="button" onClick={() => setShowAddMenu(false)} className="px-6 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all">Bỏ qua</button>
                             <button type="submit" className="px-8 py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 shadow-sm transition-all flex items-center justify-center">Lưu</button>
@@ -2511,40 +2619,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL SỬA LỊCH SỬ BÁN HÀNG (KIOTVIET STYLE) */}
-            {showHistoryEditModal && (
-                <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-                    <form onSubmit={saveHistoryEdit} className="bg-white rounded-xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden">
-                        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 bg-white shrink-0">
-                            <h3 className="text-lg font-bold text-slate-800">Sửa Hóa Đơn</h3>
-                            <button type="button" onClick={() => setShowHistoryEditModal(false)} className="text-slate-400 hover:text-slate-600 transition-colors"><Icon name="x" size={24}/></button>
-                        </div>
-                        <div className="p-6 bg-slate-50 space-y-5">
-                            <div>
-                                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tên Khách Hàng</label>
-                                <input name="customer" defaultValue={editingHistoryItem?.customer} placeholder="Nhập tên khách..." className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all" required />
-                            </div>
-                            <div>
-                                <label className="text-[13px] font-medium text-slate-600 mb-1.5 block">Tổng Số Tiền</label>
-                                <div className="relative">
-                                    <input name="total" type="number" defaultValue={editingHistoryItem?.total} placeholder="0" className="w-full p-2.5 pr-8 bg-white border border-slate-300 rounded-lg text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-right font-bold text-emerald-600 transition-all" required />
-                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">đ</span>
-                                </div>
-                            </div>
-                            <div className="bg-orange-50 border border-orange-100 p-3.5 rounded-lg flex gap-2 items-start mt-2">
-                                <Icon name="alert-circle" size={16} className="text-orange-500 mt-0.5 shrink-0" />
-                                <p className="text-[12px] font-medium text-orange-700 leading-relaxed">Lưu ý: Nếu hóa đơn sai số lượng mặt hàng, vui lòng <b>Xóa</b> hóa đơn để hệ thống tự hoàn lại kho, sau đó tạo đơn mới.</p>
-                            </div>
-                        </div>
-                        <div className="p-4 border-t border-slate-200 bg-white shrink-0 flex justify-end gap-3">
-                            <button type="button" onClick={() => setShowHistoryEditModal(false)} className="px-6 py-2.5 bg-white border border-slate-300 text-slate-600 rounded-lg font-bold text-sm hover:bg-slate-50 transition-all">Bỏ qua</button>
-                            <button type="submit" className="px-8 py-2.5 bg-emerald-500 text-white rounded-lg font-bold text-sm hover:bg-emerald-600 shadow-sm transition-all">Cập nhật</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* MODAL SỬA PHIẾU KHO (KIOTVIET STYLE) */}
+            {/* MODAL SỬA PHIẾU KHO */}
             {showStockTransEditModal && (
                 <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
                     <form onSubmit={saveStockTransEdit} className="bg-white rounded-xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden">
@@ -2569,7 +2644,7 @@ const AppPOS = ({ onNavigateAdmin }) => {
                 </div>
             )}
 
-            {/* MODAL QUẢN LÝ DANH MỤC (KIOTVIET STYLE) */}
+            {/* MODAL QUẢN LÝ DANH MỤC */}
             {showCatModal && (
                 <div className="fixed inset-0 bg-slate-900/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
                     <div className="bg-white rounded-xl w-full max-w-md flex flex-col h-[90vh] md:h-auto md:max-h-[90vh] shadow-2xl overflow-hidden">
