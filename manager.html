@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý Cửa Hàng - 226 POS</title>
+    <link rel="stylesheet" href="admin-style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .report-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .stat-card { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 5px solid #0984e3; }
+        .stat-card h4 { color: #636e72; font-size: 0.9rem; margin-bottom: 10px; }
+        .stat-card .value { font-size: 1.8rem; font-weight: bold; color: #2d3436; }
+        .stat-card.success { border-left-color: #00b894; }
+        .stat-card.warning { border-left-color: #fdcb6e; }
+    </style>
+</head>
+<body class="admin-body">
+    
+    <aside class="admin-sidebar">
+        <div class="admin-logo">
+            <i class="fa-solid fa-chart-pie"></i> MANAGER 226
+        </div>
+<ul class="admin-menu">
+<li class="menu-group">
+                <div class="menu-group-title" onclick="toggleSubMenu(this)">
+                    <div><i class="fa-solid fa-box-open"></i> Danh sách hàng hóa</div>
+                    <i class="fa-solid fa-chevron-down transition-icon" style="transform: rotate(0deg);"></i>
+                </div>
+                <ul class="sub-menu">
+                    <li onclick="switchManagerTab('categories', this)"><i class="fa-solid fa-layer-group"></i> Phân loại nhóm hàng</li>
+                    <li class="active" onclick="switchManagerTab('menu', this)"><i class="fa-solid fa-burger"></i> Thực đơn món ăn</li>
+                    <li onclick="switchManagerTab('goods', this)"><i class="fa-solid fa-boxes-stacked"></i> Kho nguyên liệu</li>
+                </ul>
+            </li>
+
+            <li class="menu-group">
+                <div class="menu-group-title" onclick="toggleSubMenu(this)">
+                    <div><i class="fa-solid fa-folder-open"></i> Tổng quan</div>
+                    <i class="fa-solid fa-chevron-down transition-icon" style="transform: rotate(0deg);"></i>
+                </div>
+                <ul class="sub-menu">
+                    <li onclick="switchManagerTab('invoices', this)"><i class="fa-solid fa-file-invoice-dollar"></i> Hóa đơn bán hàng</li>
+                    <li onclick="switchManagerTab('imports', this)"><i class="fa-solid fa-truck-ramp-box"></i> Phiếu nhập hàng</li>
+                    <li onclick="switchManagerTab('audits', this)"><i class="fa-solid fa-clipboard-check"></i> Phiếu kiểm hàng</li>
+                </ul>
+            </li>
+
+            <li onclick="switchManagerTab('reports', this)"><i class="fa-solid fa-chart-line"></i> Báo cáo tổng quan</li>
+            
+            <li style="margin-top: 50px; padding: 0;">
+                <a href="index.html" style="color: inherit; text-decoration: none; display: block; padding: 15px 20px;"><i class="fa-solid fa-cash-register"></i> Về máy POS</a>
+            </li>
+        </ul>
+    </aside>
+
+    <main class="admin-content">
+        <header class="admin-header">
+            <h2>Quản lý vận hành cửa hàng</h2>
+            <div class="admin-user"><i class="fa-solid fa-user-tie"></i> Quản lý viên</div>
+        </header>
+
+        <section id="categories-tab" class="admin-section">
+            <div class="form-card">
+                <h3>Tạo nhóm hàng mới</h3>
+                <div class="form-row multi-input">
+                    <select id="cat-type">
+                        <option value="menu">Dùng cho: Thực đơn (Món ăn)</option>
+                        <option value="goods">Dùng cho: Kho hàng (Nguyên liệu)</option>
+                    </select>
+                    <input type="text" id="cat-name" placeholder="Tên nhóm (VD: Tráng miệng, Hải sản, Gia vị)..." required>
+                    <button class="btn-add" onclick="createCategory()"><i class="fa-solid fa-plus"></i> Tạo nhóm</button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 20px;">
+                <div class="list-card" style="flex: 1;">
+                    <h3>Nhóm Thực Đơn</h3>
+                    <table class="admin-table">
+                        <thead><tr><th>Tên nhóm</th><th>Thao tác</th></tr></thead>
+                        <tbody id="menu-cat-list"></tbody>
+                    </table>
+                </div>
+                <div class="list-card" style="flex: 1;">
+                    <h3>Nhóm Kho Hàng</h3>
+                    <table class="admin-table">
+                        <thead><tr><th>Tên nhóm</th><th>Thao tác</th></tr></thead>
+                        <tbody id="goods-cat-list"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="menu-tab" class="admin-section active">
+            <div class="list-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">Danh sách Thực đơn</h3>
+                    <button class="btn-add" onclick="openCreateMenuModal()"><i class="fa-solid fa-plus"></i> Thêm món ăn mới</button>
+                </div>
+                
+                <div class="search-input-wrapper">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" placeholder="Tìm kiếm món ăn (VD: tra sua, com suon...)" oninput="handleSearchMenu(event)">
+                </div>
+
+                <table class="admin-table">
+                    <thead><tr><th>Mã món</th><th>Tên món</th><th>Nhóm</th><th>Giá bán</th><th>Thao tác</th></tr></thead>
+                    <tbody id="menu-list-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="goods-tab" class="admin-section">
+            <div class="list-card">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0;">Tồn kho hiện tại</h3>
+                    <div>
+                        <button class="btn-add" onclick="resetGoodsData()" style="background: #d63031; margin-right: 10px;"><i class="fa-solid fa-trash-can"></i> Xóa sạch toàn bộ kho</button>
+                        <button class="btn-add" onclick="openCreateGoodModal()"><i class="fa-solid fa-plus"></i> Thêm nguyên liệu</button>
+                    </div>
+                </div>
+
+                <div class="search-input-wrapper">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" placeholder="Tìm kiếm nguyên liệu (VD: thit bo, gao...)" oninput="handleSearchGood(event)">
+                </div>
+
+<table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>Mã NL</th>
+                            <th>Tên nguyên liệu</th>
+                            <th>Nhóm</th>
+                            <th>Đơn vị</th>
+                            <th>Giá vốn</th>
+                            <th>Giá bán lẻ</th>
+                            <th>Tồn kho</th>
+                            <th>Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody id="goods-list-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="invoices-tab" class="admin-section">
+            <div class="list-card">
+                <h3>Lịch sử hóa đơn</h3>
+                <table class="admin-table">
+                    <thead><tr><th>Mã HĐ</th><th>Thời gian</th><th>Thu ngân</th><th>Tổng tiền</th><th>Thao tác</th></tr></thead>
+                    <tbody id="invoices-list-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="imports-tab" class="admin-section">
+            <div class="form-card">
+                <h3>Tạo phiếu nhập nguyên liệu</h3>
+                <div class="form-row">
+                    <input type="text" id="import-supplier" placeholder="Tên nhà cung cấp..." required>
+                    <input type="number" id="import-total" placeholder="Tổng giá trị nhập (VNĐ)..." required>
+                    <button class="btn-add" onclick="createImportReceipt()"><i class="fa-solid fa-file-import"></i> Lưu phiếu nhập</button>
+                </div>
+            </div>
+            <div class="list-card">
+                <h3>Lịch sử nhập hàng</h3>
+                <table class="admin-table">
+                    <thead><tr><th>Mã phiếu</th><th>Ngày nhập</th><th>Nhà cung cấp</th><th>Giá trị</th><th>Thao tác</th></tr></thead>
+                    <tbody id="imports-list-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="audits-tab" class="admin-section">
+             <div class="form-card">
+                <h3>Ghi nhận kiểm kê kho</h3>
+                <div class="form-row">
+                    <input type="text" id="audit-note" placeholder="Ghi chú (VD: Hao hụt kho đông lạnh)..." required>
+                    <button class="btn-add" onclick="createAuditReceipt()"><i class="fa-solid fa-clipboard-check"></i> Lưu phiếu kiểm</button>
+                </div>
+            </div>
+            <div class="list-card">
+                <h3>Lịch sử kiểm hàng</h3>
+                <table class="admin-table">
+                    <thead><tr><th>Mã phiếu</th><th>Ngày kiểm</th><th>Người kiểm</th><th>Ghi chú</th><th>Thao tác</th></tr></thead>
+                    <tbody id="audits-list-body"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="reports-tab" class="admin-section">
+            <div class="report-cards">
+                <div class="stat-card">
+                    <h4>Tổng doanh thu trong ngày</h4>
+                    <div class="value" id="report-revenue">0đ</div>
+                </div>
+                <div class="stat-card success">
+                    <h4>Tổng hóa đơn</h4>
+                    <div class="value" id="report-orders">0</div>
+                </div>
+                <div class="stat-card warning">
+                    <h4>Cảnh báo tồn kho thấp</h4>
+                    <div class="value" id="report-low-stock">0 mục</div>
+                </div>
+            </div>
+            <div class="list-card">
+                <p style="text-align: center; color: #888; padding: 40px 0;">Đồ thị thống kê sẽ xuất hiện khi kết nối với CSDL thực tế.</p>
+            </div>
+        </section>
+    </main>
+
+    <div id="create-menu-modal" class="custom-modal-overlay">
+        <div class="custom-modal" style="max-width: 500px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin: 0; color: #2d3436;"><i class="fa-solid fa-burger"></i> Thêm món ăn / thức uống</h3>
+                <button onclick="closeManagerModal('create-menu-modal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #636e72;">&times;</button>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Tên món</label>
+                <input type="text" id="menu-name" placeholder="VD: Cơm sườn..." style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Giá bán (VNĐ)</label>
+                    <input type="number" id="menu-price" placeholder="VD: 45000" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+                </div>
+<div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nhóm món</label>
+                    <select id="menu-category" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+                        <option value="">-- Chọn nhóm món --</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="font-weight: 600; color: #2d3436;"><i class="fa-solid fa-blender"></i> Định lượng công thức (Tùy chọn)</label>
+                    <button type="button" onclick="addRecipeRow()" style="background: #00b894; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;"><i class="fa-solid fa-plus"></i> Thêm NL</button>
+                </div>
+                <div id="recipe-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 150px; overflow-y: auto; padding-right: 5px;">
+                </div>
+            </div>
+
+            <div style="text-align: right;">
+                <button onclick="closeManagerModal('create-menu-modal')" class="custom-modal-btn" style="background: #dfe6e9; color: #2d3436; margin-right: 10px;">Hủy</button>
+                <button onclick="createMenuItem()" class="custom-modal-btn" style="background: #0984e3; color: white;">Tạo món</button>
+            </div>
+        </div>
+    </div>
+
+<div id="create-good-modal" class="custom-modal-overlay">
+        <div class="custom-modal" style="max-width: 500px; text-align: left;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 style="margin: 0; color: #2d3436;"><i class="fa-solid fa-boxes-stacked"></i> Thêm hàng hóa / nguyên liệu</h3>
+                <button onclick="closeManagerModal('create-good-modal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #636e72;">&times;</button>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Tên mặt hàng</label>
+                <input type="text" id="good-name" placeholder="VD: Coca Cola, Chai nước suối, Sữa đặc..." style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Đơn vị tính</label>
+                    <input type="text" id="good-unit" placeholder="VD: lon, chai, kg..." style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+                </div>
+                <div style="flex: 1;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600;">Giá vốn nhập (VNĐ)</label>
+                    <input type="number" id="good-cost" placeholder="VD: 8000" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+                </div>
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Nhóm Quản lý Kho</label>
+                <select id="good-category" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+                    <option value="">-- Chọn nhóm phân loại kho --</option>
+                </select>
+            </div>
+            
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: #f8f9fa; padding: 10px; border-radius: 6px;">
+                <input type="checkbox" id="good-is-sellable" onchange="toggleGoodPriceInput()" style="width: 18px; height: 18px; cursor: pointer;">
+                <label for="good-is-sellable" style="font-weight: 600; cursor: pointer; color: #2d3436; user-select: none;">Cho phép bán trực tiếp tại màn hình POS</label>
+            </div>
+            
+            <div id="good-sell-fields" style="display: none; background: #edf2f7; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                <div style="margin-bottom: 10px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #2d3436;">Giá bán lẻ tại POS (VNĐ)</label>
+                    <input type="number" id="good-price" placeholder="VD: 15000" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; background: #fff; outline: none;">
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 5px; font-weight: 600; color: #2d3436;">Nhóm danh mục hiển thị tại POS</label>
+                    <select id="good-pos-category" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; background: #fff; outline: none;">
+                        <option value="">-- Chọn nhóm phân loại tại POS --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="text-align: right;">
+                <button onclick="closeManagerModal('create-good-modal')" class="custom-modal-btn" style="background: #dfe6e9; color: #2d3436; margin-right: 10px;">Hủy</button>
+                <button onclick="createGoodItem()" class="custom-modal-btn" style="background: #0984e3; color: white;">Lưu thông tin</button>
+            </div>
+        </div>
+    </div>
+<div id="demo-mobile-modal" class="mobile-modal-overlay" onclick="closeMobileModal('demo-mobile-modal')">
+        </div>
+    <script src="manager-script.js"></script>
+</body>
+</html>
