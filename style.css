@@ -88,10 +88,27 @@ body {
     transition: all 0.2s;
 }
 
-.categories button.active, .categories button:hover {
+/* Trạng thái nhóm đang được chọn (Javascript điều khiển) */
+.categories button.active {
     background: #0984e3;
     color: white;
     border-color: #0984e3;
+}
+
+/* Hiệu ứng lướt chuột (chỉ kích hoạt trên thiết bị có chuột như máy tính) */
+@media (hover: hover) {
+    .categories button:hover {
+        background: #0984e3;
+        color: white;
+        border-color: #0984e3;
+    }
+}
+
+/* Hiệu ứng nháy màu nhạt hơn khi ngón tay đang bấm giữ trên điện thoại */
+.categories button:active {
+    background: #74b9ff;
+    color: white;
+    border-color: #74b9ff;
 }
 
 /* =========================================

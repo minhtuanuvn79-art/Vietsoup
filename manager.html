@@ -239,32 +239,45 @@
             </button>
         </div>
         
-        <div class="mobile-modal-body">
+<div class="mobile-modal-body" id="menu-modal-scroll-area">
             <div style="margin-bottom: 15px;">
                 <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tên món</label>
-                <input type="text" id="menu-name" placeholder="VD: Cơm sườn..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                <input type="text" id="menu-name" placeholder="VD: Trà sữa truyền thống..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
             </div>
-            
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Giá bán (VNĐ)</label>
+
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nhóm món</label>
+                <select id="menu-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                    <option value="">-- Chọn nhóm --</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: #f1f2f6; padding: 12px; border-radius: 8px;">
+                <input type="checkbox" id="menu-has-sizes" onchange="toggleMenuSizes()" style="width: 20px; height: 20px; cursor: pointer;">
+                <label for="menu-has-sizes" style="font-weight: 600; cursor: pointer; color: #2d3436; user-select: none;">Món này có nhiều Size (Size S, M, L...)</label>
+            </div>
+
+            <div id="menu-default-config">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Giá bán mặc định (VNĐ)</label>
                     <input type="number" id="menu-price" placeholder="VD: 45000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
                 </div>
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nhóm món</label>
-                    <select id="menu-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-                        <option value="">-- Chọn nhóm --</option>
-                    </select>
+                <div style="margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <label style="font-weight: 600; color: #2d3436;"><i class="fa-solid fa-blender"></i> Định lượng công thức</label>
+                        <button type="button" onclick="addRecipeRow('recipe-container')" style="background: #00b894; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm NL</button>
+                    </div>
+                    <div id="recipe-container" style="display: flex; flex-direction: column; gap: 10px; padding-right: 5px;"></div>
                 </div>
             </div>
-            
-            <div style="margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="font-weight: 600; color: #2d3436;"><i class="fa-solid fa-blender"></i> Định lượng công thức</label>
-                    <button type="button" onclick="addRecipeRow()" style="background: #00b894; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm NL</button>
+
+            <div id="menu-sizes-config" style="display: none; margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <label style="font-weight: 600; color: #0984e3;"><i class="fa-solid fa-layer-group"></i> Quản lý các Size</label>
+                    <button type="button" onclick="addSizeBlock()" style="background: #0984e3; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm Size mới</button>
                 </div>
-                <div id="recipe-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 200px; overflow-y: auto; padding-right: 5px;">
-                </div>
+                <div id="sizes-container" style="display: flex; flex-direction: column; gap: 15px;">
+                    </div>
             </div>
 
             <button onclick="createMenuItem()" class="custom-modal-btn" style="width: 100%; padding: 15px; background: #0984e3; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">

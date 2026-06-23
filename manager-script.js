@@ -186,27 +186,98 @@ function deleteCategory(type, id) {
 }
 
 function updateCategorySelects() {
-    const menuSel = document.getElementById('menu-category'); if(menuSel) { menuSel.innerHTML = '<option value="">-- Chọn nhóm món --</option>'; db_categories.menu.forEach(c => menuSel.innerHTML += `<option value="${c.name}">${c.name}</option>`); }
-    const goodsSel = document.getElementById('good-category'); if(goodsSel) { goodsSel.innerHTML = '<option value="">-- Chọn nhóm NL --</option>'; db_categories.goods.forEach(c => goodsSel.innerHTML += `<option value="${c.name}">${c.name}</option>`); }
-}
+    // Nạp cho ô tạo món ăn
+    const menuSel = document.getElementById('menu-category'); 
+    if(menuSel) { 
+        menuSel.innerHTML = '<option value="">-- Chọn nhóm món --</option>'; 
+        db_categories.menu.forEach(c => menuSel.innerHTML += `<option value="${c.name}">${c.name}</option>`); 
+    }
+    
+    // Nạp cho ô tạo nguyên liệu kho
+    const goodsSel = document.getElementById('good-category'); 
+    if(goodsSel) { 
+        goodsSel.innerHTML = '<option value="">-- Chọn nhóm NL --</option>'; 
+        db_categories.goods.forEach(c => goodsSel.innerHTML += `<option value="${c.name}">${c.name}</option>`); 
+    }
 
+    // [THÊM MỚI] Nạp cho ô chọn Nhóm hiển thị tại POS (khi bật Cho phép bán lẻ)
+    const goodPosSel = document.getElementById('good-pos-category');
+    if(goodPosSel) { 
+        goodPosSel.innerHTML = '<option value="">-- Chọn nhóm tại POS --</option>'; 
+        db_categories.menu.forEach(c => goodPosSel.innerHTML += `<option value="${c.name}">${c.name}</option>`); 
+    }
+}
 function handleSearchMenu(e) { currentSearchMenu = e.target.value; renderMenu(); }
 
-function addRecipeRow(goodId = '', qty = '') {
-    let options = '<option value="">-- Chọn NL --</option>'; db_goods.forEach(g => { options += `<option value="${g.id}" ${g.id === goodId ? 'selected' : ''}>${g.name} (${g.unit})</option>`; });
-    const row = document.createElement('div'); row.style = "display: flex; gap: 10px; align-items: center;";
-    row.innerHTML = `<select class="recipe-good-id" style="flex: 2; padding: 8px; border: 1px solid #dfe6e9; border-radius: 4px;">${options}</select><input type="number" step="0.01" class="recipe-qty" placeholder="SL dùng..." value="${qty}" style="flex: 1; padding: 8px; border: 1px solid #dfe6e9; border-radius: 4px;"><button type="button" onclick="this.parentElement.remove()" style="background: #ff7675; color: white; border: none; padding: 8px; width: 35px; border-radius: 4px;"><i class="fa-solid fa-trash"></i></button>`;
-    document.getElementById('recipe-container').appendChild(row);
+// Bật/Tắt hiển thị vùng Size
+function toggleMenuSizes() {
+    const hasSizes = document.getElementById('menu-has-sizes').checked;
+    document.getElementById('menu-default-config').style.display = hasSizes ? 'none' : 'block';
+    document.getElementById('menu-sizes-config').style.display = hasSizes ? 'block' : 'none';
 }
 
-function getRecipeData() {
+// Hàm thêm hàng công thức (Đã nâng cấp để chèn vào vùng cụ thể)
+function addRecipeRow(containerId, goodId = '', qty = '') {
+    let options = '<option value="">-- Chọn NL --</option>'; 
+    db_goods.forEach(g => { options += `<option value="${g.id}" ${g.id === goodId ? 'selected' : ''}>${g.name} (${g.unit})</option>`; });
+    const row = document.createElement('div'); 
+    row.style = "display: flex; gap: 10px; align-items: center;";
+    row.innerHTML = `<select class="recipe-good-id" style="flex: 2; padding: 8px; border: 1px solid #dfe6e9; border-radius: 4px;">${options}</select><input type="number" step="0.01" class="recipe-qty" placeholder="SL dùng..." value="${qty}" style="flex: 1; padding: 8px; border: 1px solid #dfe6e9; border-radius: 4px;"><button type="button" onclick="this.parentElement.remove()" style="background: #ff7675; color: white; border: none; padding: 8px; width: 35px; border-radius: 4px;"><i class="fa-solid fa-trash"></i></button>`;
+    document.getElementById(containerId).appendChild(row);
+}
+
+function getRecipeData(containerId) {
     const recipe = [];
-    document.querySelectorAll('#recipe-container > div').forEach(row => { const goodId = row.querySelector('.recipe-good-id').value; const qty = Number(row.querySelector('.recipe-qty').value); if (goodId && qty > 0) recipe.push({ id: goodId, qty: qty }); });
+    document.querySelectorAll(`#${containerId} > div`).forEach(row => { 
+        const goodId = row.querySelector('.recipe-good-id').value; 
+        const qty = Number(row.querySelector('.recipe-qty').value); 
+        if (goodId && qty > 0) recipe.push({ id: goodId, qty: qty }); 
+    });
     return recipe;
 }
 
+// Sinh ra 1 khối Nhập liệu riêng cho từng Size (Gồm Tên Size, Giá, Công thức riêng)
+function addSizeBlock(sizeName = '', sizePrice = '', ingredients = []) {
+    const sizeId = 'size-container-' + Date.now() + Math.floor(Math.random()*1000);
+    const block = document.createElement('div');
+    block.className = 'size-block';
+    block.style = "background: #f8f9fa; border: 1px solid #dfe6e9; border-radius: 8px; padding: 15px; position: relative;";
+    block.innerHTML = `
+        <button type="button" onclick="this.parentElement.remove()" style="position: absolute; top: 10px; right: 10px; background: #ff7675; color: white; border: none; width: 28px; height: 28px; border-radius: 4px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px; padding-right: 30px;">
+            <div style="flex: 1;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: #636e72;">Tên Size</label>
+                <input type="text" class="size-name" placeholder="VD: Size L" value="${sizeName}" style="width: 100%; padding: 8px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+            </div>
+            <div style="flex: 1;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: #636e72;">Giá bán (VNĐ)</label>
+                <input type="number" class="size-price" placeholder="VD: 55000" value="${sizePrice}" style="width: 100%; padding: 8px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+            </div>
+        </div>
+        <div style="border-top: 1px dashed #dfe6e9; padding-top: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <label style="font-size: 0.85rem; font-weight: bold; color: #00b894;">Công thức riêng cho Size này</label>
+                <button type="button" onclick="addRecipeRow('${sizeId}')" style="background: #00b894; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;"><i class="fa-solid fa-plus"></i> Thêm NL</button>
+            </div>
+            <div id="${sizeId}" class="size-recipe-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+        </div>
+    `;
+    document.getElementById('sizes-container').appendChild(block);
+    
+    if (ingredients.length > 0) ingredients.forEach(ing => addRecipeRow(sizeId, ing.id, ing.qty));
+    else addRecipeRow(sizeId); // Mặc định 1 dòng
+}
+
 function openCreateMenuModal() {
-    editingMenuId = null; document.getElementById('menu-name').value = ''; document.getElementById('menu-price').value = ''; document.getElementById('menu-category').value = ''; document.getElementById('recipe-container').innerHTML = '';
+    editingMenuId = null; 
+    document.getElementById('menu-name').value = ''; 
+    document.getElementById('menu-price').value = ''; 
+    document.getElementById('menu-category').value = ''; 
+    document.getElementById('recipe-container').innerHTML = '';
+    document.getElementById('menu-has-sizes').checked = false;
+    document.getElementById('sizes-container').innerHTML = '';
+    toggleMenuSizes();
+
     const title = document.getElementById('menu-modal-title'); if (title) title.innerHTML = '<i class="fa-solid fa-burger"></i> Thêm món ăn';
     const btn = document.querySelector('#create-menu-modal .custom-modal-btn:last-child'); if (btn) { btn.innerHTML = 'Tạo món'; btn.style.background = '#0984e3'; }
     document.getElementById('create-menu-modal').classList.add('active');
@@ -214,26 +285,62 @@ function openCreateMenuModal() {
 
 function editMenuItem(id) {
     const item = db_menu.find(m => m.id === id); if (!item) return; editingMenuId = id;
-    document.getElementById('menu-name').value = item.name; document.getElementById('menu-price').value = item.price; document.getElementById('menu-category').value = item.category;
-    document.getElementById('recipe-container').innerHTML = ''; if (item.ingredients) item.ingredients.forEach(ing => addRecipeRow(ing.id, ing.qty));
-    document.getElementById('menu-modal-title').innerHTML = '<i class="fa-solid fa-pen"></i> Cập nhật món'; document.querySelector('#create-menu-modal .custom-modal-btn:last-child').innerHTML = 'Lưu thay đổi'; document.querySelector('#create-menu-modal .custom-modal-btn:last-child').style.background = '#00b894';
+    document.getElementById('menu-name').value = item.name; 
+    document.getElementById('menu-category').value = item.category;
+    document.getElementById('recipe-container').innerHTML = ''; 
+    document.getElementById('sizes-container').innerHTML = '';
+
+    if (item.hasSizes) {
+        document.getElementById('menu-has-sizes').checked = true;
+        item.sizes.forEach(sz => addSizeBlock(sz.name, sz.price, sz.ingredients));
+    } else {
+        document.getElementById('menu-has-sizes').checked = false;
+        document.getElementById('menu-price').value = item.price; 
+        if (item.ingredients) item.ingredients.forEach(ing => addRecipeRow('recipe-container', ing.id, ing.qty));
+    }
+    toggleMenuSizes();
+
+    document.getElementById('menu-modal-title').innerHTML = '<i class="fa-solid fa-pen"></i> Cập nhật món'; 
+    document.querySelector('#create-menu-modal .custom-modal-btn:last-child').innerHTML = 'Lưu thay đổi'; document.querySelector('#create-menu-modal .custom-modal-btn:last-child').style.background = '#00b894';
     document.getElementById('create-menu-modal').classList.add('active');
 }
 
 function createMenuItem() {
-    const name = document.getElementById('menu-name').value; const price = document.getElementById('menu-price').value; const category = document.getElementById('menu-category').value; const ingredients = getRecipeData();
-    if(!name || !price || !category) return AppModal.alert("Vui lòng nhập tên, giá và chọn nhóm món ăn!", "error");
+    const name = document.getElementById('menu-name').value; 
+    const category = document.getElementById('menu-category').value; 
+    const hasSizes = document.getElementById('menu-has-sizes').checked;
+    if(!name || !category) return AppModal.alert("Vui lòng nhập tên và chọn nhóm món ăn!", "error");
+
+    let finalPrice = 0; let finalIngredients = []; let finalSizes = [];
+
+    if (hasSizes) {
+        const sizeBlocks = document.querySelectorAll('.size-block');
+        if (sizeBlocks.length === 0) return AppModal.alert("Vui lòng thêm ít nhất 1 Size!", "error");
+        let valid = true;
+        sizeBlocks.forEach(block => {
+            const sName = block.querySelector('.size-name').value;
+            const sPrice = block.querySelector('.size-price').value;
+            const sRecipe = getRecipeData(block.querySelector('.size-recipe-container').id);
+            if (!sName || !sPrice) valid = false;
+            finalSizes.push({ name: sName, price: Number(sPrice), ingredients: sRecipe });
+        });
+        if (!valid) return AppModal.alert("Vui lòng nhập đầy đủ Tên Size và Giá bán cho từng Size!", "error");
+        finalPrice = finalSizes[0].price; // Lấy giá Size đầu làm đại diện
+    } else {
+        finalPrice = document.getElementById('menu-price').value;
+        if (!finalPrice) return AppModal.alert("Vui lòng nhập giá bán mặc định!", "error");
+        finalIngredients = getRecipeData('recipe-container');
+    }
+
     if (editingMenuId) { 
         const index = db_menu.findIndex(m => m.id === editingMenuId); 
-        if (index > -1) { db_menu[index] = { ...db_menu[index], name, price: Number(price), category, ingredients }; } 
+        if (index > -1) { db_menu[index] = { ...db_menu[index], name, category, hasSizes, price: Number(finalPrice), ingredients: finalIngredients, sizes: finalSizes }; } 
         AppModal.alert("Đã cập nhật món ăn!", "success"); 
     } else { 
-        db_menu.push({ id: "M" + Date.now().toString().slice(-4), name, price: Number(price), category, ingredients }); 
+        db_menu.push({ id: "M" + Date.now().toString().slice(-4), name, category, hasSizes, price: Number(finalPrice), ingredients: finalIngredients, sizes: finalSizes }); 
         AppModal.alert("Đã thêm món vào thực đơn!", "success"); 
     }
-    saveToFirebase('menuData', db_menu); 
-    closeManagerModal('create-menu-modal'); 
-    renderMenu();
+    saveToFirebase('menuData', db_menu); closeManagerModal('create-menu-modal'); renderMenu();
 }
 
 function renderMenu() {
@@ -899,15 +1006,7 @@ document.addEventListener('DOMContentLoaded', () => {
     requestWakeLock();
 });
 
-/* =========================================
-   BẢO MẬT: NGĂN CHẶN MỞ CONSOLE VÀ DEVTOOLS
-========================================= */
-document.addEventListener('contextmenu', event => event.preventDefault());
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) {
-        e.preventDefault(); console.clear();
-    }
-});
+
 
 /* =========================================
    CHẾ ĐỘ GIỮ MÀN HÌNH LUÔN SÁNG (WAKE LOCK)

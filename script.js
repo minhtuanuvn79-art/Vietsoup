@@ -91,7 +91,7 @@ function checkAuth() {
     } else {
         const user = localStorage.getItem('currentUser');
         const branch = localStorage.getItem('currentBranch'); 
-        const role = localStorage.getItem('currentRole'); // Lấy quyền hạn của người đăng nhập
+        const role = localStorage.getItem('currentRole');
         
         const userElement = document.getElementById('current-username');
         const branchElement = document.getElementById('current-branch-name');
@@ -99,20 +99,19 @@ function checkAuth() {
         if(userElement && user) userElement.innerText = user;
         if(branchElement && branch) branchElement.innerText = branch; 
 
-// Nếu là Thu Ngân -> Ẩn nút "Hệ thống tổng" (Admin) nhưng vẫn giữ nút "Quản lý cửa hàng"
-if (role === 'Thu ngân') {
-    const dropdown = document.getElementById('user-dropdown');
-    if (dropdown) {
-        dropdown.innerHTML = `
-            <div style="padding: 10px 20px; font-size: 0.9rem; color: #a4b0be; text-align: center; border-bottom: 1px solid #eee;">
-                Vai trò: Thu ngân
-            </div>
-            <a href="manager.html"><i class="fa-solid fa-chart-pie" style="color: #0984e3;"></i> Quản lý cửa hàng</a>
-            <div class="dropdown-divider"></div>
-            <a href="#" onclick="logout()" style="color: #d63031;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
-        `;
-    }
-}
+        if (role === 'Thu ngân') {
+            const dropdown = document.getElementById('user-dropdown');
+            if (dropdown) {
+                dropdown.innerHTML = `
+                    <div style="padding: 10px 20px; font-size: 0.9rem; color: #a4b0be; text-align: center; border-bottom: 1px solid #eee;">
+                        Vai trò: Thu ngân
+                    </div>
+                    <a href="manager.html"><i class="fa-solid fa-chart-pie" style="color: #0984e3;"></i> Quản lý cửa hàng</a>
+                    <div class="dropdown-divider"></div>
+                    <a href="#" onclick="logout()" style="color: #d63031;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
+                `;
+            }
+        }
     }
 }
 
@@ -133,18 +132,17 @@ checkAuth();
 let products = []; 
 let currentOrder = [];
 let currentCategoryFilter = 'all';
-
-// THÊM BIẾN LƯU TỪ KHÓA TÌM KIẾM
 let currentSearchQuery = ''; 
+
+// Dữ liệu Cloud toàn cục cho thanh toán
+let pos_goods = [];
+let pos_invoices = [];
+let posCategoriesList = ['all'];
 
 function formatMoney(amount) {
     return amount.toLocaleString('vi-VN') + 'đ';
 }
 
-// -----------------------------------------
-// THUẬT TOÁN TÌM KIẾM THÔNG MINH
-// -----------------------------------------
-// Hàm xóa dấu tiếng Việt, chuyển chữ HOA thành chữ thường để tìm kiếm tuyệt đối
 function removeAccents(str) {
     return str.normalize('NFD')
               .replace(/[\u0300-\u036f]/g, '')
@@ -154,93 +152,32 @@ function removeAccents(str) {
               .trim();
 }
 
-// Hàm được gọi mỗi khi người dùng gõ phím vào ô tìm kiếm
 function handleSearch(event) {
     currentSearchQuery = event.target.value;
-    renderProducts(); // Render lại danh sách sau mỗi ký tự được gõ
-}
-// -----------------------------------------
-
-// Biến lưu danh sách thứ tự các nhóm (để phục vụ tính năng vuốt)
-let posCategoriesList = ['all'];
-
-function loadCategoriesToPOS() {
-    const savedCategories = localStorage.getItem('categoriesData');
-    const catList = document.getElementById('category-list');
-    
-    // Reset lại mảng mỗi lần tải
-    posCategoriesList = ['all'];
-
-    if (savedCategories && catList) {
-        const parsedCats = JSON.parse(savedCategories);
-        // Thêm data-cat để JS dễ dàng tìm và CSS active
-        catList.innerHTML = `<button class="active" data-cat="all" onclick="filterCategory('all', this)">Tất cả</button>`;
-        
-        parsedCats.menu.forEach(cat => {
-            posCategoriesList.push(cat.name); // Đẩy tên nhóm vào mảng thứ tự
-            catList.innerHTML += `<button data-cat="${cat.name}" onclick="filterCategory('${cat.name}', this)">${cat.name}</button>`;
-        });
-    }
-}
-
-function loadMenuToPOS() {
-    // 1. Đồng bộ danh mục món ăn từ thực đơn gốc trước
-    const savedMenu = localStorage.getItem('menuData');
-    if (savedMenu) {
-        products = JSON.parse(savedMenu);
-    } else {
-        products = [];
-    }
-    
-    // 2. Đồng bộ các mặt hàng đa năng vừa làm nguyên liệu vừa bán lẻ từ kho
-    const savedGoods = localStorage.getItem('goodsData');
-    if (savedGoods) {
-        const goods = JSON.parse(savedGoods);
-        const sellableGoods = goods.filter(g => g.isSellable === true);
-        
-        // Chuẩn hóa cấu trúc bản ghi kho khớp hoàn toàn với cấu trúc thực đơn ngoài POS
-        const mappedGoods = sellableGoods.map(g => {
-            return {
-                id: g.id,
-                name: g.name,
-                price: g.price,
-                category: g.posCategory // Áp dụng nhóm hiển thị tại POS để khớp bộ lọc danh mục
-            };
-        });
-        
-        // Gộp chung vào danh sách hiển thị bán hàng của POS
-        products = products.concat(mappedGoods);
-    }
+    renderProducts(); 
 }
 
 function filterCategory(catName, btnElement = null) {
-    // Tránh việc render lại nếu đang ở đúng tab đó
     if (currentCategoryFilter === catName && !btnElement) return;
     
     currentCategoryFilter = catName;
     
-    // 1. Cập nhật giao diện thanh nút bấm
     const buttons = document.querySelectorAll('.categories button');
     buttons.forEach(btn => btn.classList.remove('active'));
     
     let targetBtn = btnElement;
     if (!targetBtn) {
-        // Nếu chuyển tab bằng cách vuốt (không có btnElement truyền vào), tự động tìm nút tương ứng
         targetBtn = document.querySelector(`.categories button[data-cat="${catName}"]`);
     }
     if (targetBtn) {
         targetBtn.classList.add('active');
-        // Tự động cuộn thanh menu ngang đến vị trí nút đang active
         targetBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
     
-    // 2. Tạo hiệu ứng mờ dần (Fade-out) trước khi đổi món
     const grid = document.getElementById('product-grid');
     if (grid) {
         grid.style.transition = 'opacity 0.15s ease-in-out';
         grid.style.opacity = 0;
-        
-        // Render lại danh sách sau khi đã làm mờ, rồi làm rõ dần (Fade-in)
         setTimeout(() => {
             renderProducts();
             grid.style.opacity = 1;
@@ -250,7 +187,6 @@ function filterCategory(catName, btnElement = null) {
     }
 }
 
-// NÂNG CẤP HÀM RENDER ĐỂ TÍCH HỢP BỘ LỌC TÌM KIẾM KÉP
 function renderProducts() {
     const grid = document.getElementById('product-grid');
     if (!grid) return;
@@ -258,12 +194,10 @@ function renderProducts() {
     
     let filteredProducts = products;
     
-    // 1. Lọc theo Nhóm (Nếu có chọn)
     if (currentCategoryFilter !== 'all') {
         filteredProducts = filteredProducts.filter(p => p.category === currentCategoryFilter);
     }
     
-    // 2. Lọc theo Từ khóa tìm kiếm (Thông minh không dấu)
     if (currentSearchQuery.trim() !== '') {
         const normalizedQuery = removeAccents(currentSearchQuery);
         filteredProducts = filteredProducts.filter(p => {
@@ -277,11 +211,11 @@ function renderProducts() {
         return;
     }
 
-filteredProducts.forEach(p => {
+    filteredProducts.forEach(p => {
         const div = document.createElement('div');
         div.className = 'product-card';
         div.innerHTML = `<div class="product-name">${p.name}</div><div class="product-price">${formatMoney(p.price)}</div>`;
-        div.onclick = () => openProductOptions(p); // <-- Đã sửa dòng này
+        div.onclick = () => openProductOptions(p);
         grid.appendChild(div);
     });
 }
@@ -344,6 +278,81 @@ function clearOrder() {
     }
 }
 
+function openProductOptions(product) {
+    currentCustomizingProduct = product;
+
+    // Nếu món ăn có bật tính năng chia Size, thì mới mở Modal lên để chọn
+    if (product.hasSizes && product.sizes && product.sizes.length > 0) {
+        document.getElementById('mobile-modal-product-name').innerText = product.name;
+        
+        const sizeContainer = document.getElementById('option-size-container');
+        const sizeSelect = document.getElementById('option-size');
+        
+        sizeContainer.style.display = 'block';
+        sizeSelect.innerHTML = product.sizes.map((s, index) => `<option value="${index}">${s.name} - ${formatMoney(s.price)}</option>`).join('');
+        
+        openMobileModal('product-options-modal');
+    } else {
+        // NẾU KHÔNG CÓ SIZE (và cũng không còn Đá/Đường/Topping), THÊM LUÔN VÀO GIỎ HÀNG (Bỏ qua Modal)
+        confirmAddCustomizedProduct(true);
+    }
+}
+
+function openProductOptions(product) {
+    currentCustomizingProduct = product;
+
+    // Nếu món ăn có bật tính năng chia Size, thì mới mở Modal lên để chọn
+    if (product.hasSizes && product.sizes && product.sizes.length > 0) {
+        document.getElementById('mobile-modal-product-name').innerText = product.name;
+        
+        const sizeContainer = document.getElementById('option-size-container');
+        const sizeSelect = document.getElementById('option-size');
+        
+        sizeContainer.style.display = 'block';
+        sizeSelect.innerHTML = product.sizes.map((s, index) => `<option value="${index}">${s.name} - ${formatMoney(s.price)}</option>`).join('');
+        
+        openMobileModal('product-options-modal');
+    } else {
+        // NẾU KHÔNG CÓ SIZE (và cũng không còn Đá/Đường/Topping), THÊM LUÔN VÀO GIỎ HÀNG (Bỏ qua Modal)
+        confirmAddCustomizedProduct(true);
+    }
+}
+
+function confirmAddCustomizedProduct(isDirectAdd = false) {
+    if (!currentCustomizingProduct) return;
+    
+    let customizedProduct = { ...currentCustomizingProduct };
+    customizedProduct.baseId = currentCustomizingProduct.id; // LƯU baseId GỐC để phục vụ trừ kho chính xác
+    
+    let finalPrice = customizedProduct.price;
+    let finalIngredients = customizedProduct.ingredients || []; 
+
+    // Áp dụng giá tiền và Công thức đặc thù nếu món đó đang chọn Size
+    if (!isDirectAdd && customizedProduct.hasSizes) {
+        const sizeIndex = document.getElementById('option-size').value;
+        const selectedSize = customizedProduct.sizes[sizeIndex];
+        
+        finalPrice = selectedSize.price;
+        finalIngredients = selectedSize.ingredients || []; 
+        
+        // Ghi đè tên hiển thị và ID để hóa đơn dễ nhìn
+        customizedProduct.id = `${customizedProduct.id}-SZ${sizeIndex}`;
+        customizedProduct.name = `${customizedProduct.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">(Size ${selectedSize.name})</small>`;
+    }
+
+    // Chốt lại giá trị
+    customizedProduct.price = finalPrice;
+    customizedProduct.ingredients = finalIngredients; 
+    
+    // Thêm vào giỏ hàng bên phải
+    addToOrder(customizedProduct);
+    
+    // Nếu thêm qua Modal chọn Size thì mới cần lệnh đóng Modal
+    if (!isDirectAdd) {
+        closeMobileModal('product-options-modal');
+    }
+}
+
 function checkout() {
     if (currentOrder.length === 0) {
         AppModal.alert('Vui lòng chọn ít nhất một món để thanh toán.', 'warning', 'Đơn hàng trống');
@@ -351,50 +360,39 @@ function checkout() {
     }
     
     // === 1. XỬ LÝ TỰ ĐỘNG TRỪ TỒN KHO NGUYÊN LIỆU ===
-    let goods = JSON.parse(localStorage.getItem('goodsData')) || [];
+    let goods = [...pos_goods]; 
     
     currentOrder.forEach(orderItem => {
-        // Lấy thông tin gốc của món ăn/mặt hàng từ mảng products
-        const menuData = products.find(p => p.id === orderItem.id);
-
-        if (menuData) {
-            // Trường hợp 1: Là Món ăn có định lượng công thức
-            if (menuData.ingredients && menuData.ingredients.length > 0) {
-                menuData.ingredients.forEach(ing => {
-                    const goodIndex = goods.findIndex(g => g.id === ing.id);
-                    if (goodIndex > -1) {
-                        // Trừ kho = (số lượng nguyên liệu của 1 món) x (số lượng món khách gọi)
-                        goods[goodIndex].stock -= (ing.qty * orderItem.qty);
-                        // Đảm bảo làm tròn 2 chữ số thập phân tránh lỗi JS (vd: 0.1 + 0.2 = 0.30000004)
-                        goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
-                    }
-                });
-            } 
-            // Trường hợp 2: Là Mặt hàng bán lẻ trực tiếp (Lon nước, chai suối...)
-            else if (menuData.id.startsWith("NL")) {
-                const goodIndex = goods.findIndex(g => g.id === menuData.id);
+        // Cách mới Tối ưu hóa: Dùng trực tiếp bộ "ingredients" đã được chốt (theo size) ngay lúc bấm thêm món
+        if (orderItem.ingredients && orderItem.ingredients.length > 0) {
+            orderItem.ingredients.forEach(ing => {
+                const goodIndex = goods.findIndex(g => g.id === ing.id);
                 if (goodIndex > -1) {
-                    goods[goodIndex].stock -= orderItem.qty;
+                    goods[goodIndex].stock -= (ing.qty * orderItem.qty);
+                    goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
                 }
+            });
+        } 
+        // Xử lý các món hàng bán lẻ trực tiếp (Thuốc lá, chai nước...)
+        else if (orderItem.id.startsWith("NL") || (orderItem.baseId && orderItem.baseId.startsWith("NL"))) {
+            const searchId = orderItem.baseId || orderItem.id;
+            const goodIndex = goods.findIndex(g => g.id === searchId);
+            if (goodIndex > -1) {
+                goods[goodIndex].stock -= orderItem.qty;
+                goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
             }
         }
     });
 
-    // Lưu lại dữ liệu kho mới
-    localStorage.setItem('goodsData', JSON.stringify(goods));
-    // ===============================================
-    // === 2. LƯU HÓA ĐƠN VÀO HỆ THỐNG ĐỂ LÀM BÁO CÁO ===
-    // Lấy tổng tiền số thô của đơn hàng hiện tại
+    saveToFirebase('goodsData', goods);
+
+    // === 2. LƯU HÓA ĐƠN VÀO CLOUD ===
     let rawTotal = currentOrder.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    let invoices = [...pos_invoices]; 
     
-    // Lấy mảng hóa đơn cũ hoặc khởi tạo mảng trống nếu chưa có đơn nào
-    let invoices = JSON.parse(localStorage.getItem('invoicesData')) || [];
-    
-    // Định dạng ngày hiện tại chuẩn YYYY-MM-DD để dễ đối chiếu
     const todayStr = new Date().toISOString().split('T')[0];
     const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
-// Đảm bảo hóa đơn được gán đúng chi nhánh để chia tách dữ liệu
     const newInvoice = {
         id: "HĐ" + Date.now().toString().slice(-4),
         date: todayStr,
@@ -402,51 +400,84 @@ function checkout() {
         cashier: localStorage.getItem('currentUser') || 'Thu ngân',
         branch: localStorage.getItem('currentBranch') || 'Chi nhánh 1',
         total: rawTotal,
-        // THÊM DÒNG DƯỚI ĐÂY ĐỂ LƯU DANH SÁCH MÓN ĂN VÀO HÓA ĐƠN
         items: [...currentOrder] 
     };
     
     invoices.push(newInvoice);
-    localStorage.setItem('invoicesData', JSON.stringify(invoices));
-    // =================================================
+    saveToFirebase('invoicesData', invoices);
 
-    // === 3. HIỂN THỊ THÔNG BÁO VÀ LÀM MỚI MÀN HÌNH ===
+    // === 3. THÔNG BÁO ===
     const totalPrice = document.getElementById('total-price').innerText;
-    AppModal.alert(`Đã nhận: <b style="font-size:1.3em; color:#00b894;">${totalPrice}</b><br><br>Hóa đơn đã được ghi nhận vào hệ thống.<br><small style="color:#636e72;">Đã cập nhật tự động trừ kho nguyên liệu.</small>`, 'success', 'Thanh toán thành công', () => {
-        // Xóa sạch giỏ hàng và cập nhật lại giao diện sau khi thanh toán xong
+    AppModal.alert(`Đã nhận: <b style="font-size:1.3em; color:#00b894;">${totalPrice}</b><br><br>Hóa đơn đã được đồng bộ lên Cloud.<br><small style="color:#636e72;">Đã cập nhật tự động trừ kho nguyên liệu theo Size.</small>`, 'success', 'Thanh toán thành công', () => {
         currentOrder = [];
         updateOrderUI();
     });
 }
-
 document.addEventListener('keydown', function(e) {
     if (e.key === 'F9') { e.preventDefault(); checkout(); }
 });
 
-// Chạy tự động đồng bộ khi mở màn hình Thu ngân
+// =========================================
+// KHỞI TẠO FIREBASE & LẮNG NGHE REAL-TIME
+// =========================================
 document.addEventListener('DOMContentLoaded', () => {
-    loadCategoriesToPOS();
-    loadMenuToPOS();
-    renderProducts();
+    
+// 1. Lắng nghe và cập nhật Nhóm món ăn THỜI GIAN THỰC
+listenToFirebase('categoriesData', (data) => {
+    const catList = document.getElementById('category-list');
+    posCategoriesList = ['all'];
+
+    if (catList) {
+        // Luôn luôn xóa sạch và tạo nút "Tất cả" mặc định trước tiên
+        catList.innerHTML = `<button class="active" data-cat="all" onclick="filterCategory('all', this)">Tất cả</button>`;
+        
+        // Sau đó mới kiểm tra, nếu có dữ liệu nhóm thì nạp tiếp vào
+        if (data && data.menu) {
+            data.menu.forEach(cat => {
+                posCategoriesList.push(cat.name);
+                catList.innerHTML += `<button data-cat="${cat.name}" onclick="filterCategory('${cat.name}', this)">${cat.name}</button>`;
+            });
+        }
+    }
+    filterCategory(currentCategoryFilter);
+});
+
+    // 2. Lắng nghe Thực đơn & Nguyên liệu THỜI GIAN THỰC
+    listenToFirebase('menuData', (menuData) => {
+        listenToFirebase('goodsData', (goodsData) => {
+            pos_goods = goodsData || []; // Lưu dữ liệu kho vào biến toàn cục để checkout dùng
+            products = menuData || [];
+
+            if (goodsData) {
+                const sellableGoods = goodsData.filter(g => g.isSellable === true);
+                const mappedGoods = sellableGoods.map(g => ({
+                    id: g.id,
+                    name: g.name,
+                    price: g.price,
+                    category: g.posCategory
+                }));
+                products = products.concat(mappedGoods);
+            }
+
+            renderProducts();
+        });
+    });
+
+    // 3. Lắng nghe Hóa đơn THỜI GIAN THỰC
+    listenToFirebase('invoicesData', (data) => {
+        pos_invoices = data || [];
+    });
+
     updateOrderUI();
 });
 
-/* =========================================
-   BẢO MẬT: NGĂN CHẶN MỞ CONSOLE VÀ DEVTOOLS
-========================================= */
-document.addEventListener('contextmenu', event => event.preventDefault());
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'J')) || (e.ctrlKey && e.key === 'U')) {
-        e.preventDefault(); console.clear();
-    }
-});
+
 // =========================================
 // XỬ LÝ TÙY CHỈNH MÓN (ĐÁ, ĐƯỜNG, TOPPING)
 // =========================================
 let currentCustomizingProduct = null;
 
-// Hàm 1: Đóng/Mở Modal
 function openMobileModal(modalId) {
     document.getElementById(modalId).classList.add('active');
     document.body.style.overflow = 'hidden'; 
@@ -456,54 +487,8 @@ function closeMobileModal(modalId) {
     document.body.style.overflow = '';
 }
 
-// Hàm 2: Gọi Modal hiện lên và điền thông tin món vừa chọn
-function openProductOptions(product) {
-    currentCustomizingProduct = product;
-    
-    // Đổi tiêu đề thành tên món
-    document.getElementById('mobile-modal-product-name').innerText = product.name;
-    
-    // Trả các ô select về mặc định
-    document.getElementById('option-sugar').value = '100%';
-    document.getElementById('option-ice').value = '100%';
-    document.getElementById('option-topping').value = 'Không';
-    
-    openMobileModal('product-options-modal');
-}
 
-// Hàm 3: Nhận thông tin, tính toán và thêm vào giỏ hàng (Đơn hàng)
-function confirmAddCustomizedProduct() {
-    if (!currentCustomizingProduct) return;
-    
-    const sugar = document.getElementById('option-sugar').value;
-    const ice = document.getElementById('option-ice').value;
-    const topping = document.getElementById('option-topping').value;
-    
-    // Tạo 1 bản sao của món ăn để chỉnh sửa, tránh làm lỗi giá gốc trên thực đơn
-    let customizedProduct = { ...currentCustomizingProduct };
-    
-    // Tạo chuỗi ghi chú (VD: 50% Đường, 50% Đá)
-    let optionsText = `(${sugar} Đường, ${ice} Đá`;
-    
-    // Nếu có chọn topping, tự động tính thêm 5.000đ vào giá bán
-    if (topping !== 'Không') {
-        optionsText += `, + ${topping}`;
-        customizedProduct.price += 5000; 
-    }
-    optionsText += `)`;
-    
-    // Gắn phần ghi chú nhỏ màu xám ngay dưới tên món ăn trong Giỏ hàng
-    customizedProduct.name = `${customizedProduct.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">${optionsText}</small>`;
-    
-    // Tạo mã ID độc nhất cho món ăn đi kèm tùy chỉnh này (để tránh bị gộp chung số lượng với ly bình thường)
-    customizedProduct.id = `${customizedProduct.id}-${sugar}-${ice}-${topping}`;
-    
-    // Gọi hàm có sẵn của hệ thống để quăng vào Đơn hàng
-    addToOrder(customizedProduct);
-    
-    // Đóng bảng lại
-    closeMobileModal('product-options-modal');
-}
+
 // =========================================
 // CHẾ ĐỘ GIỮ MÀN HÌNH LUÔN SÁNG (WAKE LOCK)
 // =========================================
@@ -511,12 +496,8 @@ let wakeLock = null;
 
 const requestWakeLock = async () => {
     try {
-        // Kiểm tra xem trình duyệt có hỗ trợ tính năng này không
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log('Chế độ luôn sáng màn hình đã được bật.');
-            
-            // Lắng nghe sự kiện nếu hệ thống tự hủy Wake Lock (ví dụ pin yếu)
             wakeLock.addEventListener('release', () => {
                 console.log('Chế độ luôn sáng đã bị hủy.');
             });
@@ -526,31 +507,14 @@ const requestWakeLock = async () => {
     }
 };
 
-// 1. Cố gắng bật ngay khi trang vừa tải xong
-document.addEventListener('DOMContentLoaded', () => {
-    requestWakeLock();
-});
+document.addEventListener('DOMContentLoaded', () => { requestWakeLock(); });
+document.addEventListener('click', () => { if (!wakeLock || wakeLock.released) requestWakeLock(); }, { once: true });
+document.addEventListener('visibilitychange', async () => { if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock(); });
 
-// 2. Kích hoạt dự phòng: Đa số trình duyệt di động (như Safari, Chrome) 
-// yêu cầu người dùng phải chạm vào màn hình ít nhất 1 lần thì mới cho phép chạy API này.
-document.addEventListener('click', () => {
-    if (!wakeLock || wakeLock.released) {
-        requestWakeLock();
-    }
-}, { once: true }); // Tham số once: true giúp sự kiện này chỉ kích hoạt 1 lần duy nhất để tránh giật lag
-
-// 3. Phục hồi: Trình duyệt sẽ tự động tắt tính năng này nếu nhân viên thu nhỏ trình duyệt 
-// hoặc chuyển sang tab khác. Đoạn code này giúp bật lại khi họ quay lại tab POS.
-document.addEventListener('visibilitychange', async () => {
-    if (wakeLock !== null && document.visibilityState === 'visible') {
-        requestWakeLock();
-    }
-});
 // =========================================
 // XỬ LÝ LỌC BÁO CÁO DOANH THU TẠI MÀN POS
 // =========================================
 function openPOSReportModal() {
-    // Tự động gán ngày hôm nay vào ô chọn lịch khi vừa mở bảng báo cáo lên
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('report-select-date').value = today;
     
@@ -562,17 +526,15 @@ function handleReportDateChange(event) {
     renderPOSReport(event.target.value);
 }
 
-// Biến toàn cục kiểm soát phân trang màn hình POS
 let posReportCurrentPage = 1;
 let posReportFilteredInvoices = [];
 const POS_REPORT_PAGE_SIZE = 100;
 
 function renderPOSReport(selectedDate) {
     const currentBranch = localStorage.getItem('currentBranch') || 'Chi nhánh 1';
-    const invoices = JSON.parse(localStorage.getItem('invoicesData')) || [];
     
-    // Lọc hóa đơn theo ngày và đúng chi nhánh trực thuộc
-    posReportFilteredInvoices = invoices.filter(inv => {
+    // Lấy hóa đơn từ Cloud thay vì LocalStorage
+    posReportFilteredInvoices = pos_invoices.filter(inv => {
         let invDate = inv.date;
         if (invDate.includes('/')) {
             const parts = invDate.split('/');
@@ -581,82 +543,55 @@ function renderPOSReport(selectedDate) {
         return invDate === selectedDate && inv.branch === currentBranch;
     });
 
-    // Tính tổng doanh thu và tổng số đơn dựa trên TOÀN BỘ hóa đơn của ngày đó
     let totalRevenue = posReportFilteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
     document.getElementById('pos-report-revenue').innerText = totalRevenue.toLocaleString('vi-VN') + 'đ';
     document.getElementById('pos-report-orders').innerText = posReportFilteredInvoices.length;
 
-    // Mỗi lần đổi ngày, reset về trang đầu tiên
     posReportCurrentPage = 1;
     displayPOSReportPage();
 }
+
 // =========================================
 // TÍNH NĂNG VUỐT (SWIPE) CHUYỂN NHÓM TRÊN MOBILE
 // =========================================
-let touchStartX = 0;
-let touchEndX = 0;
-let touchStartY = 0;
-let touchEndY = 0;
+let touchStartX = 0; let touchEndX = 0; let touchStartY = 0; let touchEndY = 0;
 
-function handleTouchStart(e) {
-    // Lấy tọa độ X và Y lúc ngón tay vừa chạm vào màn hình
-    touchStartX = e.changedTouches[0].screenX;
-    touchStartY = e.changedTouches[0].screenY;
-}
-
-function handleTouchEnd(e) {
-    // Lấy tọa độ X và Y lúc ngón tay nhấc lên
-    touchEndX = e.changedTouches[0].screenX;
-    touchEndY = e.changedTouches[0].screenY;
-    handleSwipeGesture();
-}
+function handleTouchStart(e) { touchStartX = e.changedTouches[0].screenX; touchStartY = e.changedTouches[0].screenY; }
+function handleTouchEnd(e) { touchEndX = e.changedTouches[0].screenX; touchEndY = e.changedTouches[0].screenY; handleSwipeGesture(); }
 
 function handleSwipeGesture() {
-    const SWIPE_THRESHOLD_X = 60; // Khoảng cách vuốt ngang tối thiểu để tính là lướt qua trang
-    const SWIPE_THRESHOLD_Y = 50; // Giới hạn vuốt dọc (tránh nhầm lẫn với việc khách đang cuộn menu xuống xem món)
+    const SWIPE_THRESHOLD_X = 60; 
+    const SWIPE_THRESHOLD_Y = 50; 
     
     const diffX = touchEndX - touchStartX;
     const diffY = touchEndY - touchStartY;
     
-    // Chỉ xử lý chuyển tab nếu vuốt ngang dài hơn vuốt dọc (chắc chắn là hành động lướt qua lại)
     if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffY) < SWIPE_THRESHOLD_Y) {
-        
-        // Vuốt sang TRÁI (ngón tay kéo từ phải qua trái) -> Chuyển sang nhóm TIẾP THEO
-        if (diffX < -SWIPE_THRESHOLD_X) {
-            switchCategoryBySwipe(1);
-        }
-        
-        // Vuốt sang PHẢI (ngón tay kéo từ trái qua phải) -> Chuyển về nhóm TRƯỚC ĐÓ
-        if (diffX > SWIPE_THRESHOLD_X) {
-            switchCategoryBySwipe(-1);
-        }
+        if (diffX < -SWIPE_THRESHOLD_X) switchCategoryBySwipe(1);
+        if (diffX > SWIPE_THRESHOLD_X) switchCategoryBySwipe(-1);
     }
 }
 
 function switchCategoryBySwipe(direction) {
-    // Tìm vị trí của nhóm hàng hiện tại trong mảng
     let currentIndex = posCategoriesList.indexOf(currentCategoryFilter);
     if (currentIndex === -1) currentIndex = 0;
 
-    // Tính vị trí trang tiếp theo
     let newIndex = currentIndex + direction;
     
-    // Chặn không cho vượt quá giới hạn (Trang đầu tiên hoặc trang cuối cùng)
     if (newIndex >= 0 && newIndex < posCategoriesList.length) {
         const nextCategory = posCategoriesList[newIndex];
-        filterCategory(nextCategory); // Gọi lại hàm lọc
+        filterCategory(nextCategory);
     }
 }
 
-// Kích hoạt "cảm biến" trên khung danh sách món ăn khi trang web tải xong
 document.addEventListener('DOMContentLoaded', () => {
     const productGrid = document.getElementById('product-grid');
     if (productGrid) {
-        // Gắn sự kiện cảm ứng
         productGrid.addEventListener('touchstart', handleTouchStart, false);
         productGrid.addEventListener('touchend', handleTouchEnd, false);
     }
 });
+
 function displayPOSReportPage() {
     const listContainer = document.getElementById('pos-report-invoice-list');
     const paginationContainer = document.getElementById('pos-report-pagination');
@@ -674,7 +609,6 @@ function displayPOSReportPage() {
     if (posReportCurrentPage > totalPages) posReportCurrentPage = totalPages;
     if (posReportCurrentPage < 1) posReportCurrentPage = 1;
 
-    // Cắt mảng dữ liệu để chỉ hiển thị tối đa 100 hóa đơn của trang hiện tại
     const startIndex = (posReportCurrentPage - 1) * POS_REPORT_PAGE_SIZE;
     const endIndex = startIndex + POS_REPORT_PAGE_SIZE;
     const pageItems = posReportFilteredInvoices.slice(startIndex, endIndex);
@@ -693,7 +627,6 @@ function displayPOSReportPage() {
         listContainer.appendChild(div);
     });
 
-    // Render bộ điều hướng phân trang nếu tổng số trang > 1
     if (totalPages > 1 && paginationContainer) {
         paginationContainer.innerHTML = `
             <button onclick="goToPOSReportPage(1)" ${posReportCurrentPage === 1 ? 'disabled' : ''} style="padding: 6px 12px; border: 1px solid #dfe6e9; background: #fff; border-radius: 6px; cursor: pointer;"><i class="fa-solid fa-angles-left"></i> Đầu</button>
@@ -711,17 +644,9 @@ function displayPOSReportPage() {
     }
 }
 
-function goToPOSReportPage(page) {
-    posReportCurrentPage = page;
-    displayPOSReportPage();
-}
-
+function goToPOSReportPage(page) { posReportCurrentPage = page; displayPOSReportPage(); }
 function jumpToPOSReportPage(val, totalPages) {
     const page = parseInt(val);
-    if (page >= 1 && page <= totalPages) {
-        posReportCurrentPage = page;
-        displayPOSReportPage();
-    } else {
-        document.getElementById('pos-page-input').value = posReportCurrentPage;
-    }
+    if (page >= 1 && page <= totalPages) { posReportCurrentPage = page; displayPOSReportPage(); } 
+    else { document.getElementById('pos-page-input').value = posReportCurrentPage; }
 }

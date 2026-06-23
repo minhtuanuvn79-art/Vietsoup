@@ -52,12 +52,8 @@
                 </div>
             </div>
 
-            <div class="categories" id="category-list">
-                <button class="active">Tất cả</button>
-                <button>Đồ ăn</button>
-                <button>Thức uống</button>
-                <button>Topping</button>
-            </div>
+<div class="categories" id="category-list">
+    </div>
             
             <div class="product-grid" id="product-grid">
                 </div>
@@ -109,41 +105,18 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
-            
-            <div class="mobile-modal-body">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Lượng đường</label>
-                    <select id="option-sugar" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #f8f9fa;">
-                        <option value="100%">100% Đường</option>
-                        <option value="70%">70% Đường</option>
-                        <option value="50%">50% Đường</option>
-                        <option value="0%">Không Đường</option>
-                    </select>
-                </div>
-                
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Lượng đá</label>
-                    <select id="option-ice" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #f8f9fa;">
-                        <option value="100%">100% Đá</option>
-                        <option value="50%">50% Đá</option>
-                        <option value="0%">Không Đá (Nóng)</option>
-                    </select>
-                </div>
 
-                <div style="margin-bottom: 25px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Topping thêm</label>
-                    <select id="option-topping" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #f8f9fa;">
-                        <option value="Không">Không thêm</option>
-                        <option value="Trân châu đen">Trân châu đen (+5.000đ)</option>
-                        <option value="Thạch trái cây">Thạch trái cây (+5.000đ)</option>
-                        <option value="Pudding trứng">Pudding trứng (+5.000đ)</option>
+<div class="mobile-modal-body">
+            <div id="option-size-container" style="margin-bottom: 25px; display: none; background: #e3f2fd; padding: 12px; border-radius: 8px; border: 1px solid #74b9ff;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #0984e3;"><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Chọn Size món</label>
+                <select id="option-size" style="width: 100%; padding: 12px; border: 1px solid #0984e3; border-radius: 8px; font-size: 1.05rem; font-weight: bold; outline: none; background: #fff; color: #0984e3;">
                     </select>
-                </div>
-
-                <button onclick="confirmAddCustomizedProduct()" style="width: 100%; padding: 15px; background: #00b894; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
-                    <i class="fa-solid fa-cart-plus"></i> Xác nhận thêm vào đơn
-                </button>
             </div>
+            
+            <button onclick="confirmAddCustomizedProduct()" style="width: 100%; padding: 15px; background: #00b894; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
+                <i class="fa-solid fa-cart-plus"></i> Xác nhận thêm vào đơn
+            </button>
+        </div>
         </div>
     </div>
 <div id="pos-report-modal" class="mobile-modal-overlay" onclick="closeMobileModal('pos-report-modal')">
