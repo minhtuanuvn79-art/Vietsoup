@@ -1,4 +1,3 @@
-
 // =========================================
 // CHỐT CHẶN BẢO MẬT: CHỈ QUẢN LÝ MỚI ĐƯỢC VÀO
 // =========================================
@@ -22,6 +21,7 @@
         }
     }
 })();
+
 const AppModal = {
     init: function() {
         if (document.getElementById('custom-modal-overlay')) return;
@@ -110,27 +110,39 @@ function encodePassword(pass) {
     return btoa(encodeURIComponent(pass));
 }
 
-// Xử lý sự kiện đăng nhập CÓ XÁC THỰC
-function handleLogin(e) {
+// Xử lý sự kiện đăng nhập CÓ XÁC THỰC TỪ FIREBASE
+async function handleLogin(e) {
     e.preventDefault();
     const user = document.getElementById('username').value;
     const pass = document.getElementById('password').value;
 
-    const savedAccounts = JSON.parse(localStorage.getItem('accountsData')) || [];
-    const validAccount = savedAccounts.find(acc => acc.username === user && acc.password === encodePassword(pass));
+    try {
+        // Chủ động tải danh sách tài khoản từ Firebase Firestore để xác thực trực tiếp
+        const doc = await db.collection("pos_226").doc("accountsData").get();
+        let savedAccounts = [];
+        if (doc.exists) {
+            savedAccounts = doc.data().items || [];
+        }
 
-    if (validAccount) {
-        localStorage.setItem('isLoggedIn', 'true');
-        localStorage.setItem('currentUser', validAccount.username);
-        localStorage.setItem('currentBranch', validAccount.branch);
-        localStorage.setItem('currentRole', validAccount.role); // BỔ SUNG LƯU QUYỀN HẠN
-        
-        document.getElementById('password').value = '';
-        console.clear(); 
-        window.location.href = "index.html";
-    } else {
-        alert("Tên đăng nhập hoặc mật khẩu không đúng!");
-        console.clear();
+        const validAccount = savedAccounts.find(acc => acc.username === user && acc.password === encodePassword(pass));
+
+        if (validAccount) {
+            // Lưu trạng thái phiên làm việc cục bộ để đảm bảo tốc độ phản hồi điều hướng ổn định
+            localStorage.setItem('isLoggedIn', 'true');
+            localStorage.setItem('currentUser', validAccount.username);
+            localStorage.setItem('currentBranch', validAccount.branch);
+            localStorage.setItem('currentRole', validAccount.role); 
+            
+            document.getElementById('password').value = '';
+            console.clear(); 
+            window.location.href = "index.html";
+        } else {
+            alert("Tên đăng nhập hoặc mật khẩu không đúng!");
+            console.clear();
+        }
+    } catch (error) {
+        alert("Lỗi kết nối với cơ sở dữ liệu Cloud. Vui lòng kiểm tra mạng!");
+        console.error("Login Error: ", error);
     }
 }
 
@@ -167,7 +179,8 @@ function createBranch() {
     db_branches.push(newBranch);
     AppModal.alert("Đã tạo chi nhánh thành công!", "success", "Thành công");
 
-    localStorage.setItem('branchesData', JSON.stringify(db_branches));
+    // Thay thế lưu cục bộ bằng hàm Firebase Cloud
+    saveToFirebase('branchesData', db_branches);
     document.getElementById('branch-name').value = '';
     document.getElementById('branch-address').value = '';
     
@@ -202,7 +215,8 @@ function saveBranchEdit() {
         db_branches[index].name = name;
         db_branches[index].address = address;
         
-        localStorage.setItem('branchesData', JSON.stringify(db_branches));
+        // Đồng bộ cập nhật lên đám mây
+        saveToFirebase('branchesData', db_branches);
         AppModal.alert("Cập nhật chi nhánh thành công!", "success");
         
         closeEditModal('edit-branch-modal');
@@ -217,7 +231,7 @@ function renderBranches() {
     tbody.innerHTML = '';
 
     if(db_branches.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Chưa có chi nhánh nào trong hệ thống</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#888;">Chưa có chi nhánh nào trong hệ thống</td></tr>';
         return;
     }
 
@@ -239,7 +253,8 @@ function renderBranches() {
 function deleteBranch(id) {
     AppModal.confirm("Hành động này không thể hoàn tác. Bạn có chắc chắn muốn xóa chi nhánh này?", () => {
         db_branches = db_branches.filter(b => b.id !== id);
-        localStorage.setItem('branchesData', JSON.stringify(db_branches));
+        // Cập nhật cấu trúc mảng mới lên Cloud
+        saveToFirebase('branchesData', db_branches);
         renderBranches();
         updateBranchSelects();
     }, "Xóa chi nhánh");
@@ -247,7 +262,7 @@ function deleteBranch(id) {
 
 function updateBranchSelects() {
     const selectAdd = document.getElementById('acc-branch');
-    const selectEdit = document.getElementById('edit-acc-branch'); // Cập nhật luôn cho Modal sửa
+    const selectEdit = document.getElementById('edit-acc-branch');
     
     let optionsHtml = '<option value="">-- Gán vào chi nhánh --</option>';
     db_branches.forEach(branch => {
@@ -282,7 +297,8 @@ function createAccount() {
     db_accounts.push(newAccount);
     AppModal.alert("Đã cấp tài khoản thành công!", "success", "Thành công");
 
-    localStorage.setItem('accountsData', JSON.stringify(db_accounts));
+    // Đẩy thông tin tài khoản mới cấp phát lên cơ sở dữ liệu Firebase
+    saveToFirebase('accountsData', db_accounts);
     document.getElementById('acc-username').value = '';
     document.getElementById('acc-password').value = '';
     
@@ -323,7 +339,8 @@ function saveAccountEdit() {
         db_accounts[editingAccountIndex].password = encodePassword(newPass);
     }
 
-    localStorage.setItem('accountsData', JSON.stringify(db_accounts));
+    // Cập nhật cấu trúc dữ liệu lên Firebase Firestore
+    saveToFirebase('accountsData', db_accounts);
     AppModal.alert("Cập nhật tài khoản thành công!", "success");
     
     closeEditModal('edit-account-modal');
@@ -336,7 +353,7 @@ function renderAccounts() {
     tbody.innerHTML = '';
 
     if(db_accounts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#888;">Chưa có tài khoản nào được tạo</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Chưa có tài khoản nào được tạo</td></tr>';
         return;
     }
 
@@ -359,41 +376,47 @@ function renderAccounts() {
 function deleteAccount(index) {
     AppModal.confirm("Hành động này sẽ vô hiệu hóa quyền truy cập. Bạn chắc chắn muốn xóa tài khoản này?", () => {
         db_accounts.splice(index, 1);
-        localStorage.setItem('accountsData', JSON.stringify(db_accounts));
+        saveToFirebase('accountsData', db_accounts);
         renderAccounts();
     }, "Xóa tài khoản");
 }
 
-// Khởi tạo giao diện và Dữ liệu mặc định
+// Khởi tạo giao diện và liên kết lắng nghe Real-time đồng bộ đám mây
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Kiểm tra và khởi tạo Chi nhánh mặc định
-    const savedBranches = localStorage.getItem('branchesData');
-    if (savedBranches) {
-        db_branches = JSON.parse(savedBranches);
-    } else {
-        // Nếu chưa có chi nhánh nào, tạo "Chi nhánh 1"
-        db_branches = [{ id: "CN0001", name: "Chi nhánh 1", address: "Địa chỉ mặc định" }];
-        localStorage.setItem('branchesData', JSON.stringify(db_branches));
-    }
+    // 1. Đồng bộ và lắng nghe danh sách Chi nhánh thời gian thực
+    listenToFirebase('branchesData', (data) => {
+        if (data) {
+            db_branches = data;
+        } else {
+            // Khởi tạo dữ liệu gốc nếu Firestore trống
+            db_branches = [{ id: "CN0001", name: "Chi nhánh 1", address: "Địa chỉ mặc định" }];
+            saveToFirebase('branchesData', db_branches);
+        }
+        if(document.getElementById('branch-list-body')) {
+            renderBranches();
+            updateBranchSelects();
+        }
+    });
 
-// 2. Kiểm tra và khởi tạo Tài khoản mặc định
-    const savedAccounts = localStorage.getItem('accountsData');
-    if (savedAccounts) {
-        db_accounts = JSON.parse(savedAccounts);
-    } else {
-        // Tạo mặc định 1 tài khoản Admin và 1 tài khoản Thu ngân
-        db_accounts = [
-            { username: 'admin', password: encodePassword('admin'), role: 'Quản lý', branch: 'Hệ thống', status: 'Hoạt động' },
-            { username: 'Thanh Ngân', password: encodePassword('1'), role: 'Thu ngân', branch: 'Chi nhánh 1', status: 'Hoạt động' }
-        ];
-        localStorage.setItem('accountsData', JSON.stringify(db_accounts));
-    }
+    // 2. Đồng bộ và lắng nghe danh sách Tài khoản hệ thống thời gian thực
+    listenToFirebase('accountsData', (data) => {
+        if (data) {
+            db_accounts = data;
+        } else {
+            // Khởi tạo cặp tài khoản quản trị và nhân viên cơ bản nếu dữ liệu trống
+            db_accounts = [
+                { username: 'admin', password: encodePassword('admin'), role: 'Quản lý', branch: 'Hệ thống', status: 'Hoạt động' },
+                { username: 'Thanh Ngân', password: encodePassword('1'), role: 'Thu ngân', branch: 'Chi nhánh 1', status: 'Hoạt động' }
+            ];
+            saveToFirebase('accountsData', db_accounts);
+        }
+        if(document.getElementById('account-list-body')) {
+            renderAccounts();
+        }
+    });
 
-    if(document.getElementById('branch-list-body')) {
-        renderBranches();
-        renderAccounts();
-        updateBranchSelects();
-    }
+    // Kích hoạt chế độ giữ sáng màn hình
+    requestWakeLock();
 });
 
 /* =========================================
@@ -407,5 +430,37 @@ document.addEventListener('keydown', function(e) {
        (e.ctrlKey && e.key === 'U')) {
         e.preventDefault();
         console.clear();
+    }
+});
+
+// =========================================
+// CHẾ ĐỘ GIỮ MÀN HÌNH LUÔN SÁNG (WAKE LOCK)
+// =========================================
+let wakeLock = null;
+
+const requestWakeLock = async () => {
+    try {
+        if ('wakeLock' in navigator) {
+            wakeLock = await navigator.wakeLock.request('screen');
+            console.log('Chế độ luôn sáng màn hình đã được bật.');
+            
+            wakeLock.addEventListener('release', () => {
+                console.log('Chế độ luôn sáng đã bị hủy.');
+            });
+        }
+    } catch (err) {
+        console.error(`Không thể bật chế độ luôn sáng: ${err.name}, ${err.message}`);
+    }
+};
+
+document.addEventListener('click', () => {
+    if (!wakeLock || wakeLock.released) {
+        requestWakeLock();
+    }
+}, { once: true });
+
+document.addEventListener('visibilitychange', async () => {
+    if (wakeLock !== null && document.visibilityState === 'visible') {
+        requestWakeLock();
     }
 });

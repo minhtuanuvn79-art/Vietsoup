@@ -2,6 +2,12 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="226 POS">
+
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b343b">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản trị - 226 POS</title>
     <link rel="stylesheet" href="admin-style.css">
@@ -89,26 +95,34 @@
         </section>
     </main>
 
-    <div id="edit-branch-modal" class="custom-modal-overlay">
-        <div class="custom-modal" style="max-width: 500px; text-align: left;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                <h3 style="margin: 0; color: #2d3436;"><i class="fa-solid fa-pen"></i> Chỉnh sửa chi nhánh</h3>
-                <button onclick="closeEditModal('edit-branch-modal')" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #636e72;">&times;</button>
-            </div>
+<div id="edit-branch-modal" class="mobile-modal-overlay" onclick="closeEditModal('edit-branch-modal')">
+    <div class="mobile-modal-sheet" onclick="event.stopPropagation()">
+        <div class="mobile-modal-handle"></div>
+        
+        <div class="mobile-modal-header">
+            <h3 style="flex: 1;"><i class="fa-solid fa-pen"></i> Chỉnh sửa chi nhánh</h3>
+            <button class="mobile-close-btn" onclick="closeEditModal('edit-branch-modal')">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        
+        <div class="mobile-modal-body">
             <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Tên chi nhánh</label>
-                <input type="text" id="edit-branch-name" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tên chi nhánh</label>
+                <input type="text" id="edit-branch-name" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
             </div>
-            <div style="margin-bottom: 20px;">
-                <label style="display: block; margin-bottom: 5px; font-weight: 600;">Địa chỉ</label>
-                <input type="text" id="edit-branch-address" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 4px; outline: none;">
+            
+            <div style="margin-bottom: 25px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Địa chỉ</label>
+                <input type="text" id="edit-branch-address" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
             </div>
-            <div style="text-align: right;">
-                <button onclick="closeEditModal('edit-branch-modal')" class="custom-modal-btn" style="background: #dfe6e9; color: #2d3436; margin-right: 10px;">Hủy</button>
-                <button onclick="saveBranchEdit()" class="custom-modal-btn" style="background: #0984e3; color: white;">Lưu thay đổi</button>
-            </div>
+            
+            <button onclick="saveBranchEdit()" style="width: 100%; padding: 15px; background: #0984e3; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
+                Lưu thay đổi
+            </button>
         </div>
     </div>
+</div>
 
     <div id="edit-account-modal" class="custom-modal-overlay">
         <div class="custom-modal" style="max-width: 500px; text-align: left;">
@@ -144,7 +158,10 @@
             </div>
         </div>
     </div>
-
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    
+    <script src="firebase-init.js"></script>
     <script src="admin-script.js"></script>
 </body>
 </html>

@@ -2,6 +2,12 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="226 POS">
+
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#2b343b">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>226 POS - Hệ thống bán hàng</title>
     <link rel="stylesheet" href="style.css">
@@ -26,12 +32,13 @@
                 <button class="hamburger-btn" onclick="toggleUserMenu()">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <div class="dropdown-content" id="user-dropdown">
-                    <a href="manager.html"><i class="fa-solid fa-chart-pie" style="color: #0984e3;"></i> Quản lý cửa hàng</a>
-                    <a href="admin.html"><i class="fa-solid fa-gears" style="color: #00cec9;"></i> Hệ thống tổng</a>
-                    <div class="dropdown-divider"></div>
-                    <a href="#" onclick="logout()" style="color: #d63031;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
-                </div>
+<div class="dropdown-content" id="user-dropdown">
+    <a href="manager.html"><i class="fa-solid fa-chart-pie" style="color: #0984e3;"></i> Quản lý cửa hàng</a>
+    <a href="admin.html"><i class="fa-solid fa-gears" style="color: #00cec9;"></i> Hệ thống tổng</a>
+    <a href="#" onclick="openPOSReportModal()"><i class="fa-solid fa-chart-line" style="color: #00b894;"></i> Xem báo cáo doanh thu</a>
+    <div class="dropdown-divider"></div>
+    <a href="#" onclick="logout()" style="color: #d63031;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
+</div>
             </div>
         </div>
     </header>
@@ -139,6 +146,47 @@
             </div>
         </div>
     </div>
+<div id="pos-report-modal" class="mobile-modal-overlay" onclick="closeMobileModal('pos-report-modal')">
+    <div class="mobile-modal-sheet" onclick="event.stopPropagation()">
+        <div class="mobile-modal-handle"></div>
+        
+        <div class="mobile-modal-header">
+            <h3 style="flex: 1;"><i class="fa-solid fa-chart-line" style="color: #00b894;"></i> Báo cáo doanh thu chi nhánh</h3>
+            <button class="mobile-close-btn" onclick="closeMobileModal('pos-report-modal')">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+        
+        <div class="mobile-modal-body">
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <label style="font-weight: 600; white-space: nowrap; color: #2d3436;">Chọn ngày xem:</label>
+                <input type="date" id="report-select-date" onchange="handleReportDateChange(event)" style="flex: 1; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #f8f9fa;">
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <div style="flex: 1; background: #f1f2f6; padding: 15px; border-radius: 12px; border-left: 5px solid #00b894; text-align: center;">
+                    <small style="color: #636e72; font-weight: 600; display: block; margin-bottom: 3px;">TỔNG DOANH THU</small>
+                    <div id="pos-report-revenue" style="font-size: 1.4rem; font-weight: bold; color: #2d3436;">0đ</div>
+                </div>
+                <div style="flex: 1; background: #f1f2f6; padding: 15px; border-radius: 12px; border-left: 5px solid #0984e3; text-align: center;">
+                    <small style="color: #636e72; font-weight: 600; display: block; margin-bottom: 3px;">TỔNG SỐ ĐƠN</small>
+                    <div id="pos-report-orders" style="font-size: 1.4rem; font-weight: bold; color: #2d3436;">0</div>
+                </div>
+            </div>
+            
+            <label style="display: block; font-weight: 600; margin-bottom: 10px; color: #2d3436;"><i class="fa-solid fa-list-ul"></i> Nhật ký hóa đơn:</label>
+            <div id="pos-report-invoice-list" style="max-height: 250px; overflow-y: auto; background: #f8f9fa; border-radius: 10px; border: 1px solid #dfe6e9; padding: 12px; display: flex; flex-direction: column; gap: 10px;">
+                </div>
+
+            <div id="pos-report-pagination" style="display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 15px; flex-wrap: wrap;">
+                </div>
+        </div>
+    </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    
+    <script src="firebase-init.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

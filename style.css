@@ -8,7 +8,7 @@
 body {
     background-color: #e9ecef;
     color: #343a40;
-    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden; /* Chống cuộn toàn trang trên Desktop */
@@ -94,22 +94,29 @@ body {
     border-color: #0984e3;
 }
 
+/* =========================================
+   VÙNG HIỂN THỊ MÓN ĂN (DẠNG THẺ NGANG)
+   ========================================= */
 .product-grid {
     flex: 1;
     padding: 15px;
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 15px;
+    /* Thay đổi mấu chốt: Tăng độ rộng minmax để tạo thành các thanh ngang */
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); 
+    gap: 12px;
     overflow-y: auto;
     align-content: start;
 }
 
-/* Card Món Ăn */
+/* Card Món Ăn Dạng Ngang */
 .product-card {
     background: #fff;
     border-radius: 8px;
-    padding: 15px;
-    text-align: center;
+    padding: 15px 18px; /* Tinh chỉnh lại khoảng cách trong thẻ */
+    display: flex; /* Bật chế độ Flexbox bẻ ngang */
+    justify-content: space-between; /* Đẩy Tên món sang trái, Giá tiền sang phải */
+    align-items: center; /* Canh giữa 2 bên theo chiều dọc */
+    text-align: left;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     border: 1px solid #e9ecef;
@@ -120,20 +127,28 @@ body {
 .product-card:active {
     transform: scale(0.97);
     border-color: #0984e3;
+    background: #f1f8ff; /* Thêm tí màu nến khi bấm vào cho nhạy */
 }
 
 .product-name {
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
-    margin-bottom: 8px;
+    margin-bottom: 0; /* Xóa margin cũ của dạng ô vuông */
     color: #2d3436;
+    flex: 1; /* Giúp tên món tự giãn ra chiếm hết khoảng trống */
+    padding-right: 15px; /* Giữ khoảng cách không cho tên đụng vào giá */
+    line-height: 1.4;
 }
 
 .product-price {
     color: #0984e3;
     font-weight: bold;
+    font-size: 1.15rem;
+    white-space: nowrap; /* Bắt buộc Giá tiền phải nằm trên 1 dòng, không bị rớt chữ */
+    background: #e3f2fd; /* Thêm nền nhẹ đằng sau giá tiền cho nổi bật */
+    padding: 6px 12px;
+    border-radius: 6px;
 }
-
 /* Vùng Hóa Đơn */
 .order-area {
     flex: 1;
@@ -554,3 +569,33 @@ body {
 /* Tùy chỉnh thanh cuộn cho nhỏ gọn */
 .mobile-modal-body::-webkit-scrollbar { width: 4px; }
 .mobile-modal-body::-webkit-scrollbar-thumb { background: #b2bec3; border-radius: 4px; }
+@media (max-width: 900px) {
+    /* Phóng to chữ ở danh sách món ăn */
+    .product-name {
+        font-size: 1.25rem; /* Gốc là 1.05rem */
+    }
+    .product-price {
+        font-size: 1.35rem; /* Gốc là 1.15rem */
+    }
+
+    /* Phóng to chữ ở phần Giỏ hàng / Đơn hàng */
+    .item-name {
+        font-size: 1.15rem;
+        font-weight: 700;
+    }
+    .item-total {
+        font-size: 1.2rem;
+    }
+    
+    /* Phóng to khu vực tổng tiền và nút bấm thanh toán */
+    .summary-row {
+        font-size: 1.1rem;
+    }
+    .total-row {
+        font-size: 1.8rem; /* Gốc là 1.5rem */
+    }
+    .order-actions button {
+        font-size: 1.3rem; /* Gốc là 1.1rem */
+        padding: 18px; /* Tăng thêm độ to của nút để dễ bấm */
+    }
+}
