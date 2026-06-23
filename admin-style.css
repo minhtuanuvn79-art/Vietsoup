@@ -243,3 +243,75 @@
 /* Tùy chỉnh thanh cuộn cho nhỏ gọn */
 .mobile-modal-body::-webkit-scrollbar { width: 4px; }
 .mobile-modal-body::-webkit-scrollbar-thumb { background: #b2bec3; border-radius: 4px; }
+/* =========================================
+   GIAO DIỆN DI ĐỘNG (MOBILE RESPONSIVE CHO ADMIN)
+========================================= */
+@media (max-width: 900px) {
+    /* Đẩy layout từ nằm ngang sang nằm dọc */
+    .admin-body {
+        flex-direction: column;
+        height: auto;
+        min-height: 100dvh;
+    }
+
+    /* Ép Sidebar nằm trên cùng, giới hạn chiều cao để không chiếm hết màn hình */
+    .admin-sidebar {
+        width: 100%;
+        height: auto;
+        max-height: 35vh; /* Menu chiếm tối đa 35% màn hình, có thể cuộn nội bộ */
+        overflow-y: auto;
+        flex-shrink: 0;
+        border-bottom: 3px solid #00cec9;
+    }
+
+    /* Nội dung chính bung hết cỡ xuống dưới */
+    .admin-content {
+        flex: 1;
+        overflow-y: visible;
+    }
+
+    /* Chỉnh lại Header cho ngay ngắn */
+    .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 15px;
+    }
+
+    .admin-section {
+        padding: 15px 10px;
+    }
+
+    /* QUAN TRỌNG: Sửa lỗi bóp méo bảng (Table) */
+    .list-card {
+        overflow-x: auto; /* Cho phép vuốt ngang bằng tay để xem bảng */
+        padding: 15px;
+    }
+
+    .admin-table {
+        min-width: 700px; /* Ép bảng giữ độ rộng thực tế, không cho rớt chữ */
+    }
+
+    /* Đưa các Form nhập liệu vào hàng dọc để dễ bấm trên cảm ứng */
+    .form-row, .form-row.multi-input {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .btn-add {
+        width: 100%;
+        margin-top: 5px;
+        padding: 12px;
+    }
+
+    /* Bẻ gãy các thẻ <div> đang bị dàn ngang nội tuyến thành 1 hàng dọc */
+    div[style*="display: flex; gap: 20px;"] {
+        flex-direction: column !important;
+    }
+    
+    div[style*="display: flex; justify-content: space-between; align-items: center;"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 12px;
+    }
+}
