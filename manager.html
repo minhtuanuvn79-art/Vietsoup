@@ -207,25 +207,56 @@
             </div>
         </section>
 
-        <section id="reports-tab" class="admin-section">
-            <div class="report-cards">
-                <div class="stat-card">
-                    <h4>Tổng doanh thu trong ngày</h4>
-                    <div class="value" id="report-revenue">0đ</div>
-                </div>
-                <div class="stat-card success">
-                    <h4>Tổng hóa đơn</h4>
-                    <div class="value" id="report-orders">0</div>
-                </div>
-                <div class="stat-card warning">
-                    <h4>Cảnh báo tồn kho thấp</h4>
-                    <div class="value" id="report-low-stock">0 mục</div>
-                </div>
-            </div>
-            <div class="list-card">
-                <p style="text-align: center; color: #888; padding: 40px 0;">Đồ thị thống kê sẽ xuất hiện khi kết nối với CSDL thực tế.</p>
-            </div>
-        </section>
+<section id="reports-tab" class="admin-section">
+    <div class="report-cards">
+        <div class="stat-card">
+            <h4>Tổng doanh thu trong ngày</h4>
+            <div class="value" id="report-revenue" style="color: #0984e3;">0đ</div>
+        </div>
+        <div class="stat-card success">
+            <h4>Tổng số đơn hàng</h4>
+            <div class="value" id="report-orders" style="color: #00b894;">0</div>
+        </div>
+        <div class="stat-card warning">
+            <h4>Cảnh báo tồn kho thấp</h4>
+            <div class="value" id="report-low-stock" style="color: #d63031;">0 mục</div>
+        </div>
+    </div>
+    
+    <!-- Căn chỉnh Layout 2 cột cho báo cáo chi tiết -->
+    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
+        <div class="list-card" style="flex: 1; min-width: 300px;">
+            <h3 style="border-bottom: 2px solid #f1f2f6; padding-bottom: 10px; margin-bottom: 15px;"><i class="fa-solid fa-fire" style="color: #e17055;"></i> Top Món Bán Chạy Hôm Nay</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Tên món ăn / Đồ uống</th>
+                        <th style="text-align: center;">SL Đã Bán</th>
+                        <th style="text-align: right;">Mang lại</th>
+                    </tr>
+                </thead>
+                <tbody id="report-top-items">
+                    <tr><td colspan="3" style="text-align:center; color:#888;">Chưa có dữ liệu bán hàng</td></tr>
+                </tbody>
+            </table>
+        </div>
+        
+        <div class="list-card" style="flex: 1; min-width: 300px;">
+            <h3 style="border-bottom: 2px solid #f1f2f6; padding-bottom: 10px; margin-bottom: 15px;"><i class="fa-solid fa-boxes-stacked" style="color: #6c5ce7;"></i> Nguyên Liệu Sắp Hết</h3>
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Tên nguyên liệu</th>
+                        <th style="text-align: center;">Tồn kho</th>
+                    </tr>
+                </thead>
+                <tbody id="report-low-stock-list">
+                    <tr><td colspan="2" style="text-align:center; color:#888;">Kho hàng đang ổn định</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
     </main>
 
 <div id="create-menu-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-menu-modal')">

@@ -65,6 +65,7 @@ body {
     flex-direction: column;
     background: #f4f6f8;
     border-right: 1px solid #ced4da;
+    overflow: hidden; /* QUAN TRỌNG: Ép khung không được phình to */
 }
 
 .categories {
@@ -615,4 +616,18 @@ body {
         font-size: 1.3rem; /* Gốc là 1.1rem */
         padding: 18px; /* Tăng thêm độ to của nút để dễ bấm */
     }
+}
+/* Làm đẹp thanh cuộn ngang cho danh mục nhóm */
+.categories::-webkit-scrollbar {
+    height: 6px;
+}
+.categories::-webkit-scrollbar-track {
+    background: #f1f2f6; 
+}
+.categories::-webkit-scrollbar-thumb {
+    background: #b2bec3; 
+    border-radius: 10px;
+}
+.categories::-webkit-scrollbar-thumb:hover {
+    background: #636e72; 
 }

@@ -110,40 +110,103 @@ function encodePassword(pass) {
     return btoa(encodeURIComponent(pass));
 }
 
+// Thay thế hoàn toàn hàm handleLogin hiện tại bằng cụm code dưới đây:
+
 // Xử lý sự kiện đăng nhập CÓ XÁC THỰC TỪ FIREBASE
 async function handleLogin(e) {
     e.preventDefault();
     const user = document.getElementById('username').value;
     const pass = document.getElementById('password').value;
+    const loginBtn = document.querySelector('.btn-login');
 
     try {
-        // Chủ động tải danh sách tài khoản từ Firebase Firestore để xác thực trực tiếp
+        // Tạm thời vô hiệu hóa nút bấm tránh spam click
+        const originalBtnText = loginBtn.innerText;
+        loginBtn.innerText = 'Đang kiểm tra...';
+        loginBtn.disabled = true;
+
+        // Chủ động tải danh sách tài khoản từ Firebase
         const doc = await db.collection("pos_226").doc("accountsData").get();
         let savedAccounts = [];
         if (doc.exists) {
             savedAccounts = doc.data().items || [];
         }
 
-        const validAccount = savedAccounts.find(acc => acc.username === user && acc.password === encodePassword(pass));
+        // THAY ĐỔI CỐT LÕI: Dùng .filter() để lấy TẤT CẢ các kết quả khớp thay vì .find()
+        const validAccounts = savedAccounts.filter(acc => acc.username === user && acc.password === encodePassword(pass));
 
-        if (validAccount) {
-            // Lưu trạng thái phiên làm việc cục bộ để đảm bảo tốc độ phản hồi điều hướng ổn định
-            localStorage.setItem('isLoggedIn', 'true');
-            localStorage.setItem('currentUser', validAccount.username);
-            localStorage.setItem('currentBranch', validAccount.branch);
-            localStorage.setItem('currentRole', validAccount.role); 
-            
-            document.getElementById('password').value = '';
-            console.clear(); 
-            window.location.href = "index.html";
-        } else {
+        // Phục hồi lại nút bấm
+        loginBtn.innerText = originalBtnText;
+        loginBtn.disabled = false;
+
+        if (validAccounts.length === 0) {
             alert("Tên đăng nhập hoặc mật khẩu không đúng!");
+            document.getElementById('password').value = '';
             console.clear();
+            return;
         }
+
+        if (validAccounts.length === 1) {
+            // Nếu chỉ có 1 quyền -> Đăng nhập thẳng luôn như cũ
+            executeLogin(validAccounts[0]);
+        } else {
+            // Nếu tài khoản này có nhiều quyền chi nhánh -> Bật Modal cho chọn
+            showBranchSelectionModal(validAccounts);
+        }
+
     } catch (error) {
         alert("Lỗi kết nối với cơ sở dữ liệu Cloud. Vui lòng kiểm tra mạng!");
         console.error("Login Error: ", error);
+        loginBtn.innerText = 'Đăng nhập hệ thống';
+        loginBtn.disabled = false;
     }
+}
+
+// Hàm thực thi lưu phiên làm việc (Session) và chuyển trang
+function executeLogin(account) {
+    localStorage.setItem('isLoggedIn', 'true');
+    localStorage.setItem('currentUser', account.username);
+    localStorage.setItem('currentBranch', account.branch);
+    localStorage.setItem('currentRole', account.role); 
+    
+    document.getElementById('password').value = '';
+    console.clear(); 
+    window.location.href = "index.html";
+}
+
+// Hàm render và hiển thị Modal chọn chi nhánh
+function showBranchSelectionModal(accounts) {
+    const container = document.getElementById('branch-buttons-container');
+    if (!container) return;
+
+    container.innerHTML = ''; // Xóa dữ liệu cũ
+
+    accounts.forEach(acc => {
+        const btn = document.createElement('button');
+        // CSS Style trực tiếp cho các nút bấm đẹp mắt
+        btn.style = "padding: 12px 15px; background: #f8f9fa; border: 2px solid #dfe6e9; border-radius: 8px; font-weight: bold; color: #2d3436; cursor: pointer; transition: 0.2s; display: flex; justify-content: space-between; align-items: center; text-align: left;";
+        btn.innerHTML = `
+            <span><i class="fa-solid fa-location-dot" style="color: #00cec9; margin-right: 8px; font-size: 1.1em;"></i> ${acc.branch}</span>
+            <span style="background: #e3f2fd; color: #0984e3; padding: 4px 8px; border-radius: 4px; font-size: 0.85rem; font-weight: 600;">${acc.role}</span>
+        `;
+        
+        // Hiệu ứng hover cho nút (đổi màu viền và nền)
+        btn.onmouseover = () => { btn.style.background = '#e3f2fd'; btn.style.borderColor = '#0984e3'; };
+        btn.onmouseout = () => { btn.style.background = '#f8f9fa'; btn.style.borderColor = '#dfe6e9'; };
+        
+        btn.onclick = () => {
+            executeLogin(acc);
+        };
+
+        container.appendChild(btn);
+    });
+
+    document.getElementById('branch-select-modal').classList.add('active');
+}
+
+// Hàm đóng Modal nếu người dùng ấn Quay lại
+function closeBranchModal() {
+    document.getElementById('branch-select-modal').classList.remove('active');
 }
 
 function switchTab(tabId) {

@@ -803,9 +803,11 @@ function renderInvoices() {
         tbody.innerHTML += `<tr>
             <td><strong>${inv.id}</strong>${itemText}</td><td>${inv.date} ${inv.time || ''}</td><td>${inv.cashier} <small style="color:#0984e3;">(${inv.branch})</small></td>
             <td style="color:#00b894; font-weight:bold;">${Number(inv.total).toLocaleString('vi-VN')}đ</td>
-            <td>
-                <button onclick="openEditInvoiceModal('${inv.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Sửa HĐ"><i class="fa-solid fa-pen"></i> Sửa HĐ</button>
-            </td></tr>`;
+<td>
+    <button onclick="openEditInvoiceModal('${inv.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Sửa HĐ"><i class="fa-solid fa-pen"></i></button>
+    <button onclick="deleteInvoice('${inv.id}')" style="background:#d63031; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Xóa HĐ"><i class="fa-solid fa-trash"></i></button>
+</td>
+            </tr>`;
     });
 
     if (totalPages > 1 && paginationContainer) {
@@ -933,13 +935,39 @@ function submitInvoiceEdit() {
     closeManagerModal('edit-invoice-modal');
     renderGoods(); renderInvoices();
 }
+function deleteInvoice(id) {
+    AppModal.confirm("Hành động này sẽ XÓA VĨNH VIỄN hóa đơn và HOÀN TRẢ lại số lượng nguyên liệu vào kho. Bạn chắc chắn muốn xóa?", () => {
+        const invoices = db_invoices;
+        const invIndex = invoices.findIndex(i => i.id === id);
+        if (invIndex === -1) return;
 
+        const invoiceToDelete = invoices[invIndex];
+
+        // 1. Hoàn trả lại tồn kho (Truyền tham số true để isRollback = true)
+        processInvoiceStock(invoiceToDelete.items, true);
+
+        // 2. Xóa hóa đơn khỏi mảng
+        invoices.splice(invIndex, 1);
+
+        // 3. Cập nhật đồng bộ lên Firebase
+        saveToFirebase('goodsData', db_goods);
+        saveToFirebase('invoicesData', invoices);
+
+        AppModal.alert("Đã xóa hóa đơn và hoàn trả kho nguyên liệu thành công!", "success");
+        
+        // 4. Render lại giao diện
+        renderGoods(); 
+        renderInvoices();
+        updateReports();
+    }, "Xóa hóa đơn");
+}
 // =========================================
 // CẬP NHẬT CHỈ SỐ BÁO CÁO (DASHBOARD TỔNG QUAN)
 // =========================================
 function updateReports() {
-    // 1. Doanh thu & Hóa đơn hôm nay
     const today = new Date().toISOString().split('T')[0];
+    
+    // 1. Tính Doanh thu & Hóa đơn hôm nay
     const todayInvoices = db_invoices.filter(inv => {
         let invDate = inv.date;
         if (invDate.includes('/')) {
@@ -956,15 +984,63 @@ function updateReports() {
     if (revEl) revEl.innerText = formatMoney(revenueToday);
     if (orderEl) orderEl.innerText = todayInvoices.length;
 
-    // 2. Cảnh báo tồn kho thấp (< 10)
-    const lowStockItems = db_goods.filter(g => g.stock < 10);
+    // 2. Phân tích Top Món Bán Chạy
+    let itemSales = {};
+    todayInvoices.forEach(inv => {
+        if(inv.items) {
+            inv.items.forEach(item => {
+                const name = item.name.replace(/<[^>]*>?/gm, ''); // Lọc bỏ thẻ HTML size
+                if (!itemSales[name]) {
+                    itemSales[name] = { qty: 0, revenue: 0 };
+                }
+                itemSales[name].qty += item.qty;
+                itemSales[name].revenue += (item.qty * item.price);
+            });
+        }
+    });
+
+    // Sắp xếp mảng bán chạy giảm dần
+    const sortedTopItems = Object.keys(itemSales)
+        .map(name => ({ name, ...itemSales[name] }))
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 5); // Lấy Top 5
+
+    const topItemsTbody = document.getElementById('report-top-items');
+    if (topItemsTbody) {
+        if (sortedTopItems.length === 0) {
+            topItemsTbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">Chưa có dữ liệu bán hàng hôm nay</td></tr>';
+        } else {
+            topItemsTbody.innerHTML = sortedTopItems.map(item => `
+                <tr>
+                    <td><strong>${item.name}</strong></td>
+                    <td style="text-align: center; font-weight: bold; color: #00b894;">${item.qty}</td>
+                    <td style="text-align: right; color: #d63031; font-weight: bold;">${formatMoney(item.revenue)}</td>
+                </tr>
+            `).join('');
+        }
+    }
+
+    // 3. Cảnh báo tồn kho thấp (< 10)
+    const lowStockItems = db_goods.filter(g => g.stock < 10).sort((a, b) => a.stock - b.stock);
     const lowStockEl = document.getElementById('report-low-stock');
+    const lowStockTbody = document.getElementById('report-low-stock-list');
+
     if (lowStockEl) {
         lowStockEl.innerText = `${lowStockItems.length} mục`;
-        if (lowStockItems.length > 0) {
-            lowStockEl.style.color = '#d63031'; // Đỏ cảnh báo
+        lowStockEl.style.color = lowStockItems.length > 0 ? '#d63031' : '#2d3436';
+    }
+
+    if (lowStockTbody) {
+        if (lowStockItems.length === 0) {
+            lowStockTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Kho hàng đang ổn định, không có mặt hàng sắp hết.</td></tr>';
         } else {
-            lowStockEl.style.color = '#2d3436';
+            // Lấy 5 mục sắp hết nhất để không làm bảng quá dài
+            lowStockTbody.innerHTML = lowStockItems.slice(0, 5).map(g => `
+                <tr>
+                    <td>${g.name} <small>(${g.unit})</small></td>
+                    <td style="text-align: center; font-weight: bold; color: #d63031; background: #ffeaa7; border-radius: 4px;">${g.stock}</td>
+                </tr>
+            `).join('');
         }
     }
 }

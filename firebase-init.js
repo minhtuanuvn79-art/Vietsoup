@@ -11,24 +11,48 @@ const firebaseConfig = {
     measurementId: "G-Z5WMB9E3J0"
 };
 
-// 2. Khởi tạo Firebase (Sử dụng API Compat để phù hợp với thẻ script hiện tại)
+// 2. Khởi tạo Firebase
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 // ==========================================
-// HỆ THỐNG HÀM ĐỒNG BỘ THAY THẾ LOCALSTORAGE
+// HỆ THỐNG LÕI: TỰ ĐỘNG PHÂN LUỒNG CHI NHÁNH
 // ==========================================
 
-// Hàm LƯU dữ liệu lên mây
-window.saveToFirebase = function(docName, dataArray) {
-    db.collection("pos_226").doc(docName).set({ items: dataArray })
-        .then(() => console.log(`[Firebase] Đã lưu ${docName} thành công!`))
-        .catch(error => console.error(`[Firebase] Lỗi lưu ${docName}:`, error));
+// Hàm tự động gắn mác chi nhánh vào tên CSDL
+function getBranchDocName(docName) {
+    // Các dữ liệu dùng chung toàn hệ thống (Bắt buộc không được chia)
+    const globalDocs = ['branchesData', 'accountsData'];
+    if (globalDocs.includes(docName)) {
+        return docName;
+    }
+    
+    // Đọc xem thiết bị này đang đăng nhập tài khoản của chi nhánh nào
+    const currentBranch = localStorage.getItem('currentBranch');
+    
+    // Nếu có chi nhánh (và không phải tài khoản admin tổng), tiến hành tách data
+    if (currentBranch && currentBranch !== 'Hệ thống') {
+        return `${docName}_${currentBranch}`;
+    }
+    
+    // Nếu không khớp, trả về mặc định
+    return docName;
 }
 
-// Hàm LẮNG NGHE Real-time (Thay thế localStorage.getItem lúc khởi động)
+// Hàm LƯU dữ liệu lên mây (Đã nâng cấp cách ly)
+window.saveToFirebase = function(docName, dataArray) {
+    const finalDocName = getBranchDocName(docName);
+    
+    db.collection("pos_226").doc(finalDocName).set({ items: dataArray })
+        .then(() => console.log(`[Firebase] Đã lưu ${finalDocName} thành công!`))
+        .catch(error => console.error(`[Firebase] Lỗi lưu ${finalDocName}:`, error));
+}
+
+// Hàm LẮNG NGHE Real-time (Đã nâng cấp cách ly)
 window.listenToFirebase = function(docName, callback) {
-    db.collection("pos_226").doc(docName).onSnapshot((doc) => {
+    const finalDocName = getBranchDocName(docName);
+    
+    db.collection("pos_226").doc(finalDocName).onSnapshot((doc) => {
         if (doc.exists) {
             callback(doc.data().items);
         } else {
