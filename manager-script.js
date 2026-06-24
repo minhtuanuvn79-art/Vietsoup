@@ -163,19 +163,100 @@ function editCategory(type, id) {
 }
 
 function renderCategories() {
-    const menuTbody = document.getElementById('menu-cat-list'); const goodsTbody = document.getElementById('goods-cat-list');
+    const menuTbody = document.getElementById('menu-cat-list'); 
+    const goodsTbody = document.getElementById('goods-cat-list');
+    
     if(menuTbody) {
         menuTbody.innerHTML = '';
-        if(db_categories.menu.length === 0) menuTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Chưa có nhóm</td></tr>';
-        else db_categories.menu.forEach(c => { menuTbody.innerHTML += `<tr><td>${c.name}</td><td style="width: 140px;"><button onclick="editCategory('menu', '${c.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;"><i class="fa-solid fa-pen"></i></button><button onclick="deleteCategory('menu', '${c.id}')" style="background:#ff7675; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button></td></tr>`; });
+        if(db_categories.menu.length === 0) {
+            menuTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Chưa có nhóm</td></tr>';
+        } else {
+            db_categories.menu.forEach((c) => { 
+                menuTbody.innerHTML += `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <i class="fa-solid fa-grip-vertical drag-handle" style="color: #b2bec3; font-size: 1.3rem; cursor: grab; padding: 10px 5px;" title="Đè và Kéo"></i> 
+                            <strong>${c.name}</strong>
+                        </div>
+                    </td>
+                    <td style="width: 120px;">
+                        <button onclick="editCategory('menu', '${c.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteCategory('menu', '${c.id}')" style="background:#ff7675; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`; 
+            });
+        }
     }
+    
     if(goodsTbody) {
         goodsTbody.innerHTML = '';
-        if(db_categories.goods.length === 0) goodsTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Chưa có nhóm</td></tr>';
-        else db_categories.goods.forEach(c => { goodsTbody.innerHTML += `<tr><td>${c.name}</td><td style="width: 140px;"><button onclick="editCategory('goods', '${c.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;"><i class="fa-solid fa-pen"></i></button><button onclick="deleteCategory('goods', '${c.id}')" style="background:#ff7675; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button></td></tr>`; });
+        if(db_categories.goods.length === 0) {
+            goodsTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Chưa có nhóm</td></tr>';
+        } else {
+            db_categories.goods.forEach((c) => { 
+                goodsTbody.innerHTML += `
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 15px;">
+                            <i class="fa-solid fa-grip-vertical drag-handle" style="color: #b2bec3; font-size: 1.3rem; cursor: grab; padding: 10px 5px;" title="Đè và Kéo"></i> 
+                            <strong>${c.name}</strong>
+                        </div>
+                    </td>
+                    <td style="width: 120px;">
+                        <button onclick="editCategory('goods', '${c.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteCategory('goods', '${c.id}')" style="background:#ff7675; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                </tr>`; 
+            });
+        }
+    }
+
+    // Kích hoạt tính năng kéo thả ngay sau khi danh sách được vẽ ra
+    initDragAndDrop();
+}
+// Khai báo biến toàn cục để đảm bảo chỉ khởi tạo công cụ kéo thả 1 lần
+let menuSortable, goodsSortable;
+
+// Hàm kích hoạt Kéo - Thả
+function initDragAndDrop() {
+    const menuEl = document.getElementById('menu-cat-list');
+    const goodsEl = document.getElementById('goods-cat-list');
+
+    // Cấu hình kéo thả cho Nhóm Thực Đơn
+    if (menuEl && !menuSortable) {
+        menuSortable = new Sortable(menuEl, {
+            animation: 150, // Hiệu ứng trượt mượt mà
+            handle: '.drag-handle', // Bắt buộc đè ngón tay vào biểu tượng 6 chấm mới kéo được (chống lỗi khi cuộn trang)
+            ghostClass: 'sortable-ghost', // Làm mờ mục đang kéo
+            onEnd: function (evt) {
+                // Khi thả tay ra: Cắt nhóm ở vị trí cũ và chèn vào vị trí mới
+                const movedItem = db_categories.menu.splice(evt.oldIndex, 1)[0];
+                db_categories.menu.splice(evt.newIndex, 0, movedItem);
+                
+                // Đồng bộ thứ tự mới lên Cloud ngay lập tức
+                saveToFirebase('categoriesData', db_categories);
+                updateCategorySelects();
+            }
+        });
+    }
+
+    // Cấu hình kéo thả cho Nhóm Kho Hàng
+    if (goodsEl && !goodsSortable) {
+        goodsSortable = new Sortable(goodsEl, {
+            animation: 150,
+            handle: '.drag-handle',
+            ghostClass: 'sortable-ghost',
+            onEnd: function (evt) {
+                const movedItem = db_categories.goods.splice(evt.oldIndex, 1)[0];
+                db_categories.goods.splice(evt.newIndex, 0, movedItem);
+                
+                saveToFirebase('categoriesData', db_categories);
+                updateCategorySelects();
+            }
+        });
     }
 }
-
 function deleteCategory(type, id) {
     AppModal.confirm("Xóa nhóm hàng này?", () => { 
         db_categories[type] = db_categories[type].filter(c => c.id !== id); 
@@ -184,7 +265,28 @@ function deleteCategory(type, id) {
         updateCategorySelects(); 
     });
 }
+// Hàm di chuyển vị trí nhóm hàng trong mảng
+function moveCategory(type, index, direction) {
+    // direction: -1 (Di chuyển lên/trái), 1 (Di chuyển xuống/phải)
+    const newIndex = index + direction;
 
+    // Kiểm tra để đảm bảo không bị vượt quá giới hạn của mảng
+    if (newIndex < 0 || newIndex >= db_categories[type].length) {
+        return; 
+    }
+
+    // Hoán đổi vị trí 2 phần tử trong mảng
+    const temp = db_categories[type][index];
+    db_categories[type][index] = db_categories[type][newIndex];
+    db_categories[type][newIndex] = temp;
+
+    // Lưu mảng mới lên Firebase (Trang POS sẽ tự động nhảy vị trí ngay lập tức)
+    saveToFirebase('categoriesData', db_categories);
+
+    // Render lại giao diện bảng quản lý
+    renderCategories();
+    updateCategorySelects();
+}
 function updateCategorySelects() {
     // Nạp cho ô tạo món ăn
     const menuSel = document.getElementById('menu-category'); 
