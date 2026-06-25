@@ -631,3 +631,74 @@ body {
 .categories::-webkit-scrollbar-thumb:hover {
     background: #636e72; 
 }
+/* =========================================
+   PHÓNG TO CHỮ TRÊN CÁC MODAL CHO ĐIỆN THOẠI
+========================================= */
+@media (max-width: 900px) {
+    /* 1. Phóng to Popup Thông báo (Thanh toán thành công, Hủy đơn...) */
+    .custom-modal-title {
+        font-size: 1.8rem !important; /* Gốc là 1.5rem */
+    }
+    .custom-modal-msg {
+        font-size: 1.3rem !important; /* Gốc là 1.05rem, to rõ ràng hơn */
+        line-height: 1.6;
+    }
+    .custom-modal-btn {
+        font-size: 1.25rem !important; /* Phóng to nút bấm Đồng ý / Hủy */
+        padding: 15px 25px !important;
+    }
+
+    /* 2. Phóng to bảng kéo từ dưới lên (Xem báo cáo doanh thu) */
+    .mobile-modal-header h3 {
+        font-size: 1.5rem !important; /* To tiêu đề bảng */
+    }
+    .mobile-modal-body label {
+        font-size: 1.2rem !important;
+    }
+    .mobile-modal-body div {
+        font-size: 1.15rem !important; /* To các dòng lịch sử hóa đơn */
+    }
+    .mobile-modal-body input {
+        font-size: 1.2rem !important;
+        padding: 15px !important; /* Phóng to ô chọn ngày */
+    }
+    
+    /* Phóng to số liệu Tổng tiền / Tổng đơn ở màn báo cáo */
+    #pos-report-revenue, #pos-report-orders {
+        font-size: 1.8rem !important; 
+    }
+}
+/* =========================================
+   TĂNG KÍCH THƯỚC CHỮ CHO MÀN HÌNH BÁN HÀNG
+========================================= */
+@media (max-width: 900px) {
+    /* Tăng chữ tên món ăn */
+    .product-name {
+        font-size: 1.4rem !important; /* Phóng to tên món */
+        line-height: 1.3;
+    }
+    
+    /* Tăng chữ giá tiền */
+    .product-price {
+        font-size: 1.4rem !important; /* Phóng to giá tiền */
+        padding: 8px 15px !important;
+    }
+
+    /* Tăng chữ trong hóa đơn chi tiết bên phải */
+    .item-name {
+        font-size: 1.25rem !important; /* Chữ tên món trong hóa đơn */
+    }
+    
+    .item-price {
+        font-size: 1.1rem !important; /* Chữ đơn giá trong hóa đơn */
+    }
+    
+    .item-total {
+        font-size: 1.3rem !important; /* Chữ thành tiền của món */
+    }
+
+    /* Tăng chữ cho các nút cộng/trừ số lượng */
+    .item-qty-controls span {
+        font-size: 1.2rem !important; /* Số lượng món */
+    }
+}

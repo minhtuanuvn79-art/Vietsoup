@@ -19,23 +19,18 @@ const db = firebase.firestore();
 // HỆ THỐNG LÕI: TỰ ĐỘNG PHÂN LUỒNG CHI NHÁNH
 // ==========================================
 
-// Hàm tự động gắn mác chi nhánh vào tên CSDL
 function getBranchDocName(docName) {
-    // Các dữ liệu dùng chung toàn hệ thống (Bắt buộc không được chia)
     const globalDocs = ['branchesData', 'accountsData'];
     if (globalDocs.includes(docName)) {
         return docName;
     }
     
-    // Đọc xem thiết bị này đang đăng nhập tài khoản của chi nhánh nào
     const currentBranch = localStorage.getItem('currentBranch');
     
-    // Nếu có chi nhánh (và không phải tài khoản admin tổng), tiến hành tách data
     if (currentBranch && currentBranch !== 'Hệ thống') {
         return `${docName}_${currentBranch}`;
     }
     
-    // Nếu không khớp, trả về mặc định
     return docName;
 }
 

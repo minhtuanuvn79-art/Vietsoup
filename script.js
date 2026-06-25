@@ -99,6 +99,7 @@ function checkAuth() {
         if(userElement && user) userElement.innerText = user;
         if(branchElement && branch) branchElement.innerText = branch; 
 
+        // Nếu là Thu ngân, vẽ lại menu nhưng CÓ THÊM nút xem báo cáo
         if (role === 'Thu ngân') {
             const dropdown = document.getElementById('user-dropdown');
             if (dropdown) {
@@ -107,6 +108,10 @@ function checkAuth() {
                         Vai trò: Thu ngân
                     </div>
                     <a href="manager.html"><i class="fa-solid fa-chart-pie" style="color: #0984e3;"></i> Quản lý cửa hàng</a>
+                    
+                    <!-- ĐÃ THÊM LẠI NÚT XEM BÁO CÁO CHO THU NGÂN -->
+                    <a href="#" onclick="openPOSReportModal()"><i class="fa-solid fa-chart-line" style="color: #00b894;"></i> Xem báo cáo doanh thu</a>
+                    
                     <div class="dropdown-divider"></div>
                     <a href="#" onclick="logout()" style="color: #d63031;"><i class="fa-solid fa-right-from-bracket"></i> Đăng xuất</a>
                 `;
@@ -194,10 +199,12 @@ function renderProducts() {
     
     let filteredProducts = products;
     
+    // Lọc theo danh mục
     if (currentCategoryFilter !== 'all') {
         filteredProducts = filteredProducts.filter(p => p.category === currentCategoryFilter);
     }
     
+    // Lọc theo từ khóa tìm kiếm
     if (currentSearchQuery.trim() !== '') {
         const normalizedQuery = removeAccents(currentSearchQuery);
         filteredProducts = filteredProducts.filter(p => {
@@ -212,11 +219,43 @@ function renderProducts() {
     }
 
     filteredProducts.forEach(p => {
-        const div = document.createElement('div');
-        div.className = 'product-card';
-        div.innerHTML = `<div class="product-name">${p.name}</div><div class="product-price">${formatMoney(p.price)}</div>`;
-        div.onclick = () => openProductOptions(p);
-        grid.appendChild(div);
+        // NẾU MÓN CÓ NHIỀU SIZE: Tách mỗi size thành 1 ô riêng biệt trên lưới
+        if (p.hasSizes && p.sizes && p.sizes.length > 0) {
+            p.sizes.forEach((size, index) => {
+                const div = document.createElement('div');
+                div.className = 'product-card';
+                // Đưa tên size xuống dòng nhỏ để dễ nhìn
+                div.innerHTML = `
+                    <div class="product-name">${p.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">(Size ${size.name})</small></div>
+                    <div class="product-price">${formatMoney(size.price)}</div>
+                `;
+                
+                // Khi bấm vào sẽ thêm trực tiếp vào đơn hàng với giá và công thức của size đó
+                div.onclick = () => {
+                    let customizedProduct = { ...p };
+                    customizedProduct.baseId = p.id; // Lưu lại ID gốc để hệ thống biết trừ kho chính xác
+                    customizedProduct.id = `${p.id}-SZ${index}`;
+                    customizedProduct.name = `${p.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">(Size ${size.name})</small>`;
+                    customizedProduct.price = size.price;
+                    customizedProduct.ingredients = size.ingredients || []; // Nạp công thức riêng của size
+                    
+                    addToOrder(customizedProduct);
+                };
+                grid.appendChild(div);
+            });
+        } 
+        // NẾU MÓN KHÔNG CÓ SIZE: Giữ nguyên giao diện hiển thị 1 ô cũ
+        else {
+            const div = document.createElement('div');
+            div.className = 'product-card';
+            div.innerHTML = `<div class="product-name">${p.name}</div><div class="product-price">${formatMoney(p.price)}</div>`;
+            div.onclick = () => {
+                let directProduct = { ...p };
+                directProduct.baseId = p.id;
+                addToOrder(directProduct);
+            };
+            grid.appendChild(div);
+        }
     });
 }
 
@@ -243,14 +282,24 @@ function updateOrderUI() {
         totalQty += item.qty;
         const div = document.createElement('div');
         div.className = 'order-item';
+        
+        // CẬP NHẬT: Thêm nút thùng rác màu đỏ bên cạnh Tổng tiền của món
         div.innerHTML = `
-            <div class="item-info"><div class="item-name">${item.name}</div><div class="item-price">${formatMoney(item.price)}</div></div>
+            <div class="item-info">
+                <div class="item-name">${item.name}</div>
+                <div class="item-price">${formatMoney(item.price)}</div>
+            </div>
             <div class="item-qty-controls">
                 <button onclick="changeQty('${item.id}', -1)">-</button>
-                <span style="min-width: 20px; text-align: center;">${item.qty}</span>
+                <span style="min-width: 20px; text-align: center; font-weight: bold;">${item.qty}</span>
                 <button onclick="changeQty('${item.id}', 1)">+</button>
             </div>
-            <div class="item-total">${formatMoney(item.price * item.qty)}</div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="item-total">${formatMoney(item.price * item.qty)}</div>
+                <button onclick="removeOrderItem('${item.id}')" style="background: #ff7675; color: white; border: none; padding: 6px 10px; border-radius: 4px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.background='#d63031'" onmouseout="this.style.background='#ff7675'">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
         `;
         container.appendChild(div);
     });
@@ -268,7 +317,11 @@ function changeQty(id, delta) {
         updateOrderUI();
     }
 }
-
+// Hàm xóa thẳng món ăn khỏi hóa đơn
+function removeOrderItem(id) {
+    currentOrder = currentOrder.filter(item => item.id !== id);
+    updateOrderUI();
+}
 function clearOrder() {
     if (currentOrder.length > 0) {
         AppModal.confirm('Tất cả các món đang chọn sẽ bị xóa. Bạn chắc chắn muốn hủy đơn này?', () => {
@@ -278,80 +331,9 @@ function clearOrder() {
     }
 }
 
-function openProductOptions(product) {
-    currentCustomizingProduct = product;
 
-    // Nếu món ăn có bật tính năng chia Size, thì mới mở Modal lên để chọn
-    if (product.hasSizes && product.sizes && product.sizes.length > 0) {
-        document.getElementById('mobile-modal-product-name').innerText = product.name;
-        
-        const sizeContainer = document.getElementById('option-size-container');
-        const sizeSelect = document.getElementById('option-size');
-        
-        sizeContainer.style.display = 'block';
-        sizeSelect.innerHTML = product.sizes.map((s, index) => `<option value="${index}">${s.name} - ${formatMoney(s.price)}</option>`).join('');
-        
-        openMobileModal('product-options-modal');
-    } else {
-        // NẾU KHÔNG CÓ SIZE (và cũng không còn Đá/Đường/Topping), THÊM LUÔN VÀO GIỎ HÀNG (Bỏ qua Modal)
-        confirmAddCustomizedProduct(true);
-    }
-}
 
-function openProductOptions(product) {
-    currentCustomizingProduct = product;
 
-    // Nếu món ăn có bật tính năng chia Size, thì mới mở Modal lên để chọn
-    if (product.hasSizes && product.sizes && product.sizes.length > 0) {
-        document.getElementById('mobile-modal-product-name').innerText = product.name;
-        
-        const sizeContainer = document.getElementById('option-size-container');
-        const sizeSelect = document.getElementById('option-size');
-        
-        sizeContainer.style.display = 'block';
-        sizeSelect.innerHTML = product.sizes.map((s, index) => `<option value="${index}">${s.name} - ${formatMoney(s.price)}</option>`).join('');
-        
-        openMobileModal('product-options-modal');
-    } else {
-        // NẾU KHÔNG CÓ SIZE (và cũng không còn Đá/Đường/Topping), THÊM LUÔN VÀO GIỎ HÀNG (Bỏ qua Modal)
-        confirmAddCustomizedProduct(true);
-    }
-}
-
-function confirmAddCustomizedProduct(isDirectAdd = false) {
-    if (!currentCustomizingProduct) return;
-    
-    let customizedProduct = { ...currentCustomizingProduct };
-    customizedProduct.baseId = currentCustomizingProduct.id; // LƯU baseId GỐC để phục vụ trừ kho chính xác
-    
-    let finalPrice = customizedProduct.price;
-    let finalIngredients = customizedProduct.ingredients || []; 
-
-    // Áp dụng giá tiền và Công thức đặc thù nếu món đó đang chọn Size
-    if (!isDirectAdd && customizedProduct.hasSizes) {
-        const sizeIndex = document.getElementById('option-size').value;
-        const selectedSize = customizedProduct.sizes[sizeIndex];
-        
-        finalPrice = selectedSize.price;
-        finalIngredients = selectedSize.ingredients || []; 
-        
-        // Ghi đè tên hiển thị và ID để hóa đơn dễ nhìn
-        customizedProduct.id = `${customizedProduct.id}-SZ${sizeIndex}`;
-        customizedProduct.name = `${customizedProduct.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">(Size ${selectedSize.name})</small>`;
-    }
-
-    // Chốt lại giá trị
-    customizedProduct.price = finalPrice;
-    customizedProduct.ingredients = finalIngredients; 
-    
-    // Thêm vào giỏ hàng bên phải
-    addToOrder(customizedProduct);
-    
-    // Nếu thêm qua Modal chọn Size thì mới cần lệnh đóng Modal
-    if (!isDirectAdd) {
-        closeMobileModal('product-options-modal');
-    }
-}
 
 function checkout() {
     if (currentOrder.length === 0) {
