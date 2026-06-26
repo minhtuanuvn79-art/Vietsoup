@@ -128,18 +128,38 @@ body {
 
 /* Card Món Ăn Dạng Ngang */
 .product-card {
+    position: relative; /* THÊM DÒNG NÀY ĐỂ ĐỊNH VỊ TRÍ CHO SỐ LƯỢNG */
     background: #fff;
     border-radius: 8px;
-    padding: 15px 18px; /* Tinh chỉnh lại khoảng cách trong thẻ */
-    display: flex; /* Bật chế độ Flexbox bẻ ngang */
-    justify-content: space-between; /* Đẩy Tên món sang trái, Giá tiền sang phải */
-    align-items: center; /* Canh giữa 2 bên theo chiều dọc */
+    padding: 15px 18px;
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
     text-align: left;
     cursor: pointer;
     box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     border: 1px solid #e9ecef;
     transition: transform 0.1s, border-color 0.1s;
     user-select: none;
+}
+
+/* THÊM MỚI: Hình tròn hiển thị số lượng đã chọn góc phải */
+.product-qty-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #d63031;
+    color: white;
+    font-size: 1rem;
+    font-weight: bold;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid #fff;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    z-index: 10;
 }
 
 .product-card:active {
@@ -701,4 +721,91 @@ body {
     .item-qty-controls span {
         font-size: 1.2rem !important; /* Số lượng món */
     }
+}
+/* =========================================
+   GIAO DIỆN GIỎ HÀNG NỔI (MOBILE)
+========================================= */
+/* Nút giỏ hàng nổi (Mặc định ẩn trên PC) */
+.mobile-cart-btn {
+    display: none; 
+    position: fixed;
+    bottom: 30px;
+    right: 20px;
+    background: #0984e3;
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 60px;
+    font-size: 1.5rem;
+    box-shadow: 0 5px 15px rgba(9, 132, 227, 0.4);
+    z-index: 9999;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.mobile-cart-btn:active {
+    transform: scale(0.9);
+}
+
+/* Số lượng đính kèm trên nút */
+.cart-badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: #d63031;
+    color: white;
+    font-size: 0.9rem;
+    font-weight: bold;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    line-height: 26px;
+    border: 2px solid #f4f6f8;
+}
+
+/* Nút tắt giỏ hàng (Ẩn trên PC) */
+.close-cart-mobile {
+    display: none;
+    background: #f1f2f6;
+    border: none;
+    color: #d63031;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+/* Kích hoạt chế độ màn hình điện thoại */
+@media (max-width: 900px) {
+    .mobile-cart-btn {
+        display: block; /* Hiện nút nổi */
+    }
+    
+    .close-cart-mobile {
+        display: block; /* Hiện nút X tắt giỏ hàng */
+    }
+
+    /* Biến khu vực Order thành bảng trượt Modal */
+    .order-area {
+        position: fixed !important;
+        top: 0;
+        right: -100%; /* Ban đầu giấu ra ngoài màn hình bên phải */
+        width: 100%;
+        height: 100dvh !important;
+        z-index: 10000;
+        transition: right 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        border-top: none !important;
+        box-shadow: -5px 0 15px rgba(0,0,0,0.1);
+    }
+
+    /* Khi class 'show' được thêm vào, bảng sẽ trượt ra */
+    .order-area.show {
+        right: 0;
+    }
+    
+    /* Chỉnh lại padding để dễ bấm trên điện thoại */
+    .order-header { padding: 20px; }
+    .order-actions { padding: 20px; padding-bottom: 40px; }
 }

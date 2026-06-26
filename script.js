@@ -135,7 +135,7 @@ checkAuth();
 // LOGIC BÁN HÀNG VÀ ĐỒNG BỘ DỮ LIỆU
 // =========================================
 let products = []; 
-let currentOrder = [];
+let currentOrder = JSON.parse(localStorage.getItem('pos_current_order')) || [];
 let currentCategoryFilter = 'all';
 let currentSearchQuery = ''; 
 
@@ -224,31 +224,49 @@ function renderProducts() {
             p.sizes.forEach((size, index) => {
                 const div = document.createElement('div');
                 div.className = 'product-card';
-                // Đưa tên size xuống dòng nhỏ để dễ nhìn
+                
+                // KẾT HỢP TÌM SỐ LƯỢNG ĐÃ CHỌN
+                const itemId = `${p.id}-SZ${index}`;
+                const orderItem = currentOrder.find(item => item.id === itemId);
+                const qty = orderItem ? orderItem.qty : 0;
+                const badgeStyle = qty > 0 ? 'display: flex;' : 'display: none;';
+
                 div.innerHTML = `
+                    <div class="product-qty-badge" id="badge-${itemId}" style="${badgeStyle}">${qty}</div>
                     <div class="product-name">${p.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">(Size ${size.name})</small></div>
                     <div class="product-price">${formatMoney(size.price)}</div>
                 `;
                 
-                // Khi bấm vào sẽ thêm trực tiếp vào đơn hàng với giá và công thức của size đó
+                // Khi bấm vào sẽ thêm trực tiếp vào đơn hàng
                 div.onclick = () => {
                     let customizedProduct = { ...p };
-                    customizedProduct.baseId = p.id; // Lưu lại ID gốc để hệ thống biết trừ kho chính xác
-                    customizedProduct.id = `${p.id}-SZ${index}`;
+                    customizedProduct.baseId = p.id; 
+                    customizedProduct.id = itemId;
                     customizedProduct.name = `${p.name} <br><small style="color: #636e72; font-size: 0.85em; font-weight: normal;">(Size ${size.name})</small>`;
                     customizedProduct.price = size.price;
-                    customizedProduct.ingredients = size.ingredients || []; // Nạp công thức riêng của size
+                    customizedProduct.ingredients = size.ingredients || []; 
                     
                     addToOrder(customizedProduct);
                 };
                 grid.appendChild(div);
             });
         } 
-        // NẾU MÓN KHÔNG CÓ SIZE: Giữ nguyên giao diện hiển thị 1 ô cũ
+        // NẾU MÓN KHÔNG CÓ SIZE: Giữ nguyên giao diện hiển thị 1 ô
         else {
             const div = document.createElement('div');
             div.className = 'product-card';
-            div.innerHTML = `<div class="product-name">${p.name}</div><div class="product-price">${formatMoney(p.price)}</div>`;
+
+            // KẾT HỢP TÌM SỐ LƯỢNG ĐÃ CHỌN
+            const itemId = p.id;
+            const orderItem = currentOrder.find(item => item.id === itemId);
+            const qty = orderItem ? orderItem.qty : 0;
+            const badgeStyle = qty > 0 ? 'display: flex;' : 'display: none;';
+
+            div.innerHTML = `
+                <div class="product-qty-badge" id="badge-${itemId}" style="${badgeStyle}">${qty}</div>
+                <div class="product-name">${p.name}</div><div class="product-price">${formatMoney(p.price)}</div>
+            `;
+            
             div.onclick = () => {
                 let directProduct = { ...p };
                 directProduct.baseId = p.id;
@@ -269,6 +287,10 @@ function addToOrder(product) {
 function updateOrderUI() {
     const container = document.getElementById('order-items');
     if (!container) return;
+    
+    // 1. LƯU TRỮ GIỎ HÀNG XUỐNG LOCALSTORAGE ĐỂ CHỐNG MẤT DỮ LIỆU KHI RELOAD
+    localStorage.setItem('pos_current_order', JSON.stringify(currentOrder));
+    
     container.innerHTML = '';
     
     let totalAmount = 0, totalQty = 0;
@@ -283,7 +305,7 @@ function updateOrderUI() {
         const div = document.createElement('div');
         div.className = 'order-item';
         
-        // CẬP NHẬT: Thêm nút thùng rác màu đỏ bên cạnh Tổng tiền của món
+        // Giao diện chi tiết từng món ăn trong giỏ hàng kèm nút xóa nhanh
         div.innerHTML = `
             <div class="item-info">
                 <div class="item-name">${item.name}</div>
@@ -304,9 +326,21 @@ function updateOrderUI() {
         container.appendChild(div);
     });
 
+    // 2. CẬP NHẬT SỐ LIỆU LÊN GIAO DIỆN HÓA ĐƠN CHÍNH
     document.getElementById('total-qty').innerText = totalQty;
     document.getElementById('sub-total').innerText = formatMoney(totalAmount);
     document.getElementById('total-price').innerText = formatMoney(totalAmount);
+
+    // 3. CẬP NHẬT SỐ LƯỢNG MÓN ĐANG CHỌN LÊN NÚT GIỎ HÀNG NỔI TRÊN MOBILE
+    const mobileBadge = document.getElementById('mobile-cart-badge');
+    if (mobileBadge) {
+        mobileBadge.innerText = totalQty;
+    }
+
+    // 4. TỰ ĐỘNG ĐỒNG BỘ SỐ LƯỢNG ĐÃ CHỌN RA NGOÀI THẺ MÓN ĂN (MENU)
+    if (typeof syncProductBadges === 'function') {
+        syncProductBadges();
+    }
 }
 
 function changeQty(id, delta) {
@@ -372,7 +406,8 @@ function checkout() {
     let rawTotal = currentOrder.reduce((sum, item) => sum + (item.price * item.qty), 0);
     let invoices = [...pos_invoices]; 
     
-    const todayStr = new Date().toISOString().split('T')[0];
+    const d = new Date();
+const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
     const newInvoice = {
@@ -496,38 +531,113 @@ document.addEventListener('visibilitychange', async () => { if (wakeLock !== nul
 // =========================================
 // XỬ LÝ LỌC BÁO CÁO DOANH THU TẠI MÀN POS
 // =========================================
+// =========================================
+// XỬ LÝ LỌC BÁO CÁO DOANH THU TẠI MÀN POS
+// =========================================
 function openPOSReportModal() {
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('report-select-date').value = today;
+    const d = new Date();
+    const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     
-    renderPOSReport(today);
+    document.getElementById('report-select-date').value = today;
+    document.getElementById('report-time-start').value = '';
+    document.getElementById('report-time-end').value = '';
+    
+document.getElementById('enable-time-filter').checked = false;
+    document.getElementById('time-filter-wrapper').style.display = 'none';
+    
+    const currentBranch = localStorage.getItem('currentBranch') || 'Chi nhánh 1';
+    const branchInvoices = pos_invoices.filter(inv => inv.branch === currentBranch);
+    const uniqueCashiers = [...new Set(branchInvoices.map(inv => inv.cashier))].filter(Boolean);
+    
+    const cashierSelect = document.getElementById('report-select-cashier');
+    cashierSelect.innerHTML = '<option value="all">-- Tất cả --</option>';
+    uniqueCashiers.forEach(c => {
+        cashierSelect.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+    
+    renderPOSReport();
     openMobileModal('pos-report-modal');
+
+    // ==========================================
+    // KHỞI TẠO BỘ LỌC NGÀY/GIỜ GIAO DIỆN MỚI
+    // ==========================================
+    // 1. Giao diện chọn Ngày (Tiếng Việt)
+    flatpickr("#report-select-date", {
+        dateFormat: "Y-m-d",
+        locale: "vn",
+        disableMobile: "true", // Ép dùng giao diện custom trên điện thoại thay vì gốc
+        onChange: function() { handleReportFilterChange(); }
+    });
+
+    // 2. Giao diện chọn Giờ
+    flatpickr("#report-time-start, #report-time-end", {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: "H:i",
+        time_24hr: true,
+        disableMobile: "true", // Ép dùng giao diện custom trên điện thoại thay vì gốc
+        onChange: function() { handleReportFilterChange(); }
+    });
 }
 
-function handleReportDateChange(event) {
-    renderPOSReport(event.target.value);
+// Hàm gộp chung: Kích hoạt khi Đổi ngày / Đổi Thu ngân / Đổi Giờ
+function handleReportFilterChange() {
+    renderPOSReport();
 }
-
+// Bật/Tắt hiển thị và reset lọc giờ
+function toggleTimeFilter() {
+    const isEnabled = document.getElementById('enable-time-filter').checked;
+    document.getElementById('time-filter-wrapper').style.display = isEnabled ? 'flex' : 'none';
+    handleReportFilterChange(); // Tự động load lại báo cáo ngay khi tích/bỏ tích
+}
 let posReportCurrentPage = 1;
 let posReportFilteredInvoices = [];
 const POS_REPORT_PAGE_SIZE = 100;
 
-function renderPOSReport(selectedDate) {
+function renderPOSReport() {
     const currentBranch = localStorage.getItem('currentBranch') || 'Chi nhánh 1';
     
-    // Lấy hóa đơn từ Cloud thay vì LocalStorage
+    // Lấy các giá trị bộ lọc hiện tại từ giao diện
+    const selectedDate = document.getElementById('report-select-date').value;
+    const selectedCashier = document.getElementById('report-select-cashier').value;
+    const isTimeFilterEnabled = document.getElementById('enable-time-filter').checked;
+    const startTime = document.getElementById('report-time-start').value;
+    const endTime = document.getElementById('report-time-end').value;
+    
+    // Tiến hành lọc 4 lớp: Chi nhánh -> Ngày -> Thu ngân -> Giờ
     posReportFilteredInvoices = pos_invoices.filter(inv => {
+        // 1. Lọc Chi nhánh
+        if (inv.branch !== currentBranch) return false;
+
+        // 2. Lọc Ngày
         let invDate = inv.date;
         if (invDate.includes('/')) {
             const parts = invDate.split('/');
             invDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
-        return invDate === selectedDate && inv.branch === currentBranch;
+        if (invDate !== selectedDate) return false;
+
+        // 3. Lọc Thu ngân
+        if (selectedCashier !== 'all' && inv.cashier !== selectedCashier) return false;
+
+        // 4. Lọc Khung giờ (Chỉ áp dụng khi Checkbox được bật)
+        if (isTimeFilterEnabled && (startTime || endTime)) {
+            if (!inv.time) return false; // Nếu hóa đơn cũ thiếu dữ liệu giờ thì bỏ qua
+            const invTime = inv.time.trim(); 
+            if (startTime && invTime < startTime) return false;
+            if (endTime && invTime > endTime) return false;
+        }
+
+        return true;
     });
 
+    // Cập nhật lên thẻ báo cáo tổng
     let totalRevenue = posReportFilteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
-    document.getElementById('pos-report-revenue').innerText = totalRevenue.toLocaleString('vi-VN') + 'đ';
-    document.getElementById('pos-report-orders').innerText = posReportFilteredInvoices.length;
+    const revenueEl = document.getElementById('pos-report-revenue');
+    const ordersEl = document.getElementById('pos-report-orders');
+    
+    if (revenueEl) revenueEl.innerText = totalRevenue.toLocaleString('vi-VN') + 'đ';
+    if (ordersEl) ordersEl.innerText = posReportFilteredInvoices.length;
 
     posReportCurrentPage = 1;
     displayPOSReportPage();
@@ -631,4 +741,35 @@ function jumpToPOSReportPage(val, totalPages) {
     const page = parseInt(val);
     if (page >= 1 && page <= totalPages) { posReportCurrentPage = page; displayPOSReportPage(); } 
     else { document.getElementById('pos-page-input').value = posReportCurrentPage; }
+}
+// Đóng/Mở giỏ hàng trên điện thoại
+function toggleMobileCart() {
+    const orderArea = document.querySelector('.order-area');
+    if (!orderArea) return;
+    
+    orderArea.classList.toggle('show');
+    
+    // Khóa cuộn màn hình nền khi đang mở giỏ hàng
+    if(orderArea.classList.contains('show')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+// Hàm đồng bộ số lượng món đang chọn hiển thị ra ngoài Menu
+function syncProductBadges() {
+    // Ẩn tất cả số lượng trước
+    document.querySelectorAll('.product-qty-badge').forEach(badge => {
+        badge.style.display = 'none';
+        badge.innerText = '0';
+    });
+
+    // Lặp qua giỏ hàng, món nào có thì hiện số lượng lên
+    currentOrder.forEach(item => {
+        const badge = document.getElementById(`badge-${item.id}`);
+        if (badge) {
+            badge.style.display = 'flex';
+            badge.innerText = item.qty;
+        }
+    });
 }

@@ -12,6 +12,8 @@
     <title>226 POS - Hệ thống bán hàng</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" type="text/css" href="https://npmcdn.com/flatpickr/dist/themes/material_blue.css">
 </head>
 <body>
     <header class="pos-header">
@@ -60,12 +62,15 @@
         </main>
 
         <aside class="order-area">
-            <div class="order-header">
-                <h2>Đơn hàng hiện tại</h2>
-                <span class="order-type">
-                    <i class="fa-solid fa-utensils"></i> Tại bàn
-                </span>
-            </div>
+<div class="order-header">
+    <h2>Đơn hàng hiện tại</h2>
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span class="order-type"><i class="fa-solid fa-utensils"></i> Tại bàn</span>
+        <button class="close-cart-mobile" onclick="toggleMobileCart()">
+            <i class="fa-solid fa-xmark"></i>
+        </button>
+    </div>
+</div>
             
             <div class="order-items" id="order-items">
                 </div>
@@ -108,11 +113,31 @@
         </div>
         
         <div class="mobile-modal-body">
-            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                <label style="font-weight: 600; white-space: nowrap; color: #2d3436;">Chọn ngày xem:</label>
-                <input type="date" id="report-select-date" onchange="handleReportDateChange(event)" style="flex: 1; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #f8f9fa;">
-            </div>
-            
+<div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+    <label style="font-weight: 600; white-space: nowrap; color: #2d3436; width: 85px;">Ngày:</label>
+    <input type="text" id="report-select-date" placeholder="Chọn ngày..." style="flex: 1; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #fff; cursor: pointer;">
+</div>
+
+<div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+    <label style="font-weight: 600; white-space: nowrap; color: #2d3436; width: 85px;">Thu ngân:</label>
+    <select id="report-select-cashier" onchange="handleReportFilterChange()" style="flex: 1; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #f8f9fa;">
+        <option value="all">-- Tất cả --</option>
+    </select>
+</div>
+
+<div style="margin-bottom: 20px;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+        <input type="checkbox" id="enable-time-filter" onchange="toggleTimeFilter()" style="width: 18px; height: 18px; cursor: pointer;">
+        <label for="enable-time-filter" style="font-weight: 600; color: #0984e3; cursor: pointer; user-select: none;">Bật lọc theo khung giờ</label>
+    </div>
+    
+    <div id="time-filter-wrapper" style="display: none; align-items: center; gap: 10px; padding-left: 28px;">
+        <input type="text" id="report-time-start" placeholder="Từ giờ..." style="flex: 1; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #fff; cursor: pointer;">
+        <span style="font-weight: bold; color: #636e72;">-</span>
+        <input type="text" id="report-time-end" placeholder="Đến giờ..." style="flex: 1; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; font-size: 1rem; outline: none; background: #fff; cursor: pointer;">
+    </div>
+</div>
+
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
                 <div style="flex: 1; background: #f1f2f6; padding: 15px; border-radius: 12px; border-left: 5px solid #00b894; text-align: center;">
                     <small style="color: #636e72; font-weight: 600; display: block; margin-bottom: 3px;">TỔNG DOANH THU</small>
@@ -133,10 +158,16 @@
         </div>
     </div>
 </div>
+<div class="mobile-cart-btn" onclick="toggleMobileCart()">
+    <i class="fa-solid fa-basket-shopping"></i>
+    <span class="cart-badge" id="mobile-cart-badge">0</span>
+</div>
 <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
     
     <script src="firebase-init.js"></script>
     <script src="script.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://npmcdn.com/flatpickr/dist/l10n/vn.js"></script>
 </body>
 </html>

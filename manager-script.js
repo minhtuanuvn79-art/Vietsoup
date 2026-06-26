@@ -1066,29 +1066,174 @@ function deleteInvoice(id) {
 // =========================================
 // CẬP NHẬT CHỈ SỐ BÁO CÁO (DASHBOARD TỔNG QUAN)
 // =========================================
-function updateReports() {
-    const today = new Date().toISOString().split('T')[0];
+// Hàm hiển thị/ẩn bộ chọn lịch tùy chỉnh
+function handleManagerReportFilterChange() {
+    const timeFilter = document.getElementById('manager-report-time').value;
+    const customDateDiv = document.getElementById('manager-report-custom-date');
     
-    // 1. Tính Doanh thu & Hóa đơn hôm nay
-    const todayInvoices = db_invoices.filter(inv => {
+    if (timeFilter === 'custom') {
+        customDateDiv.style.display = 'flex';
+    } else {
+        customDateDiv.style.display = 'none';
+    }
+    updateReports();
+}
+
+// =========================================
+// CẬP NHẬT CHỈ SỐ BÁO CÁO (DASHBOARD TỔNG QUAN)
+// =========================================
+// =========================================
+// CẬP NHẬT CHỈ SỐ BÁO CÁO (DASHBOARD TỔNG QUAN)
+// =========================================
+function updateReports() {
+    const timeFilter = document.getElementById('manager-report-time')?.value || 'today';
+    const cashierFilter = document.getElementById('manager-report-cashier')?.value || 'all';
+
+    // 1. Cập nhật danh sách Thu ngân tự động từ hệ thống
+    const cashierSelect = document.getElementById('manager-report-cashier');
+    if (cashierSelect) {
+        const uniqueCashiers = [...new Set(db_invoices.map(inv => inv.cashier))].filter(Boolean);
+        const currentSelected = cashierSelect.value; // Giữ lại người đang chọn
+        
+        cashierSelect.innerHTML = '<option value="all">-- Tất cả --</option>';
+        uniqueCashiers.forEach(c => {
+            cashierSelect.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        
+        if (uniqueCashiers.includes(currentSelected)) {
+            cashierSelect.value = currentSelected;
+        }
+    }
+
+    // 2. Xử lý tính toán ngày tháng theo Bộ Lọc
+    let startDate = '';
+    let endDate = '';
+    const todayObj = new Date();
+    
+    const formatDate = (d) => {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
+    if (timeFilter === 'today') {
+        startDate = endDate = formatDate(todayObj);
+    } else if (timeFilter === 'yesterday') {
+        const yesterday = new Date(todayObj);
+        yesterday.setDate(yesterday.getDate() - 1);
+        startDate = endDate = formatDate(yesterday);
+    } else if (timeFilter === 'this_month') {
+        startDate = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-01`;
+        endDate = formatDate(todayObj);
+    } else if (timeFilter === 'last_month') {
+        const lastMonth = new Date(todayObj.getFullYear(), todayObj.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 0);
+        startDate = formatDate(lastMonth);
+        endDate = formatDate(endOfLastMonth);
+    } else if (timeFilter === 'this_year') {
+        startDate = `${todayObj.getFullYear()}-01-01`;
+        endDate = formatDate(todayObj);
+    } else if (timeFilter === 'custom') {
+        startDate = document.getElementById('manager-report-start').value;
+        endDate = document.getElementById('manager-report-end').value;
+    }
+
+    // 3. Tiến hành Lọc Hóa Đơn
+    const filteredInvoices = db_invoices.filter(inv => {
+        // Định dạng chuẩn lại ngày của hóa đơn
         let invDate = inv.date;
         if (invDate.includes('/')) {
             const parts = invDate.split('/');
             invDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
         }
-        return invDate === today;
+
+        // Cắt bỏ HĐ ngoài Khoảng thời gian
+        if (startDate && invDate < startDate) return false;
+        if (endDate && invDate > endDate) return false;
+
+        // Cắt bỏ HĐ nếu không đúng Nhân viên
+        if (cashierFilter !== 'all' && inv.cashier !== cashierFilter) return false;
+
+        return true;
     });
 
-    const revenueToday = todayInvoices.reduce((sum, inv) => sum + inv.total, 0);
+    // 4. Cập nhật thẻ Doanh Thu & Số đơn
+    const revenueTotal = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0);
     const revEl = document.getElementById('report-revenue');
     const orderEl = document.getElementById('report-orders');
     
-    if (revEl) revEl.innerText = formatMoney(revenueToday);
-    if (orderEl) orderEl.innerText = todayInvoices.length;
+    if (revEl) revEl.innerText = formatMoney(revenueTotal);
+    if (orderEl) orderEl.innerText = filteredInvoices.length;
 
-    // 2. Phân tích Top Món Bán Chạy
+    // -----------------------------------------
+    // 4.5 TÍNH TOÁN & GỌI VẼ BIỂU ĐỒ DOANH THU
+    // -----------------------------------------
+    let chartLabels = [];
+    let chartData = [];
+
+    // Nếu lọc "Hôm nay" hoặc "Hôm qua" -> Chia biểu đồ theo 24 Cột Giờ (0h -> 23h)
+    if (timeFilter === 'today' || timeFilter === 'yesterday') {
+        chartLabels = Array.from({length: 24}, (_, i) => `${i}:00`);
+        chartData = Array(24).fill(0);
+        
+        filteredInvoices.forEach(inv => {
+            if (inv.time) {
+                const hour = parseInt(inv.time.split(':')[0]);
+                if (!isNaN(hour)) chartData[hour] += inv.total;
+            }
+        });
+    } 
+    // Nếu lọc "Năm nay" -> Chia biểu đồ theo 12 Cột Tháng (Tháng 1 -> 12)
+    else if (timeFilter === 'this_year') {
+        chartLabels = Array.from({length: 12}, (_, i) => `Tháng ${i+1}`);
+        chartData = Array(12).fill(0);
+        
+        filteredInvoices.forEach(inv => {
+            let invDate = inv.date;
+            if (invDate.includes('/')) {
+                 const parts = invDate.split('/');
+                 invDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+            const month = parseInt(invDate.split('-')[1]) - 1; // getMonth() bắt đầu từ 0
+            if (!isNaN(month)) chartData[month] += inv.total;
+        });
+    } 
+    // Nếu lọc "Tháng này", "1 tháng trước", hoặc "Tùy chỉnh" -> Chia biểu đồ theo Cột Ngày
+    else {
+        let dailyData = {};
+        filteredInvoices.forEach(inv => {
+            let invDate = inv.date;
+            if (invDate.includes('/')) {
+                 const parts = invDate.split('/');
+                 invDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+            if (!dailyData[invDate]) dailyData[invDate] = 0;
+            dailyData[invDate] += inv.total;
+        });
+        
+        // Quét tạo các cột tương ứng với từng ngày trong khoảng thời gian
+        if (startDate && endDate) {
+            let startD = new Date(startDate);
+            let endD = new Date(endDate);
+            while (startD <= endD) {
+                const dateStr = `${startD.getFullYear()}-${String(startD.getMonth() + 1).padStart(2, '0')}-${String(startD.getDate()).padStart(2, '0')}`;
+                const displayStr = `${String(startD.getDate()).padStart(2, '0')}/${String(startD.getMonth() + 1).padStart(2, '0')}`;
+                
+                chartLabels.push(displayStr);
+                chartData.push(dailyData[dateStr] || 0);
+                
+                startD.setDate(startD.getDate() + 1);
+            }
+        }
+    }
+    
+    // Gọi hàm vẽ đè biểu đồ ra giao diện
+    if (typeof renderRevenueChart === 'function') {
+        renderRevenueChart(chartLabels, chartData);
+    }
+    // -----------------------------------------
+
+    // 5. Phân tích Top Món Bán Chạy trong khoảng thời gian đã lọc
     let itemSales = {};
-    todayInvoices.forEach(inv => {
+    filteredInvoices.forEach(inv => {
         if(inv.items) {
             inv.items.forEach(item => {
                 const name = item.name.replace(/<[^>]*>?/gm, ''); // Lọc bỏ thẻ HTML size
@@ -1101,7 +1246,6 @@ function updateReports() {
         }
     });
 
-    // Sắp xếp mảng bán chạy giảm dần
     const sortedTopItems = Object.keys(itemSales)
         .map(name => ({ name, ...itemSales[name] }))
         .sort((a, b) => b.qty - a.qty)
@@ -1110,7 +1254,7 @@ function updateReports() {
     const topItemsTbody = document.getElementById('report-top-items');
     if (topItemsTbody) {
         if (sortedTopItems.length === 0) {
-            topItemsTbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">Chưa có dữ liệu bán hàng hôm nay</td></tr>';
+            topItemsTbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888;">Chưa có dữ liệu bán hàng</td></tr>';
         } else {
             topItemsTbody.innerHTML = sortedTopItems.map(item => `
                 <tr>
@@ -1122,7 +1266,7 @@ function updateReports() {
         }
     }
 
-    // 3. Cảnh báo tồn kho thấp (< 10)
+    // 6. Cảnh báo tồn kho (Đây là thông số thực tế kho, không chịu ảnh hưởng của bộ lọc thời gian)
     const lowStockItems = db_goods.filter(g => g.stock < 10).sort((a, b) => a.stock - b.stock);
     const lowStockEl = document.getElementById('report-low-stock');
     const lowStockTbody = document.getElementById('report-low-stock-list');
@@ -1134,9 +1278,8 @@ function updateReports() {
 
     if (lowStockTbody) {
         if (lowStockItems.length === 0) {
-            lowStockTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Kho hàng đang ổn định, không có mặt hàng sắp hết.</td></tr>';
+            lowStockTbody.innerHTML = '<tr><td colspan="2" style="text-align:center; color:#888;">Kho hàng đang ổn định.</td></tr>';
         } else {
-            // Lấy 5 mục sắp hết nhất để không làm bảng quá dài
             lowStockTbody.innerHTML = lowStockItems.slice(0, 5).map(g => `
                 <tr>
                     <td>${g.name} <small>(${g.unit})</small></td>
@@ -1146,7 +1289,54 @@ function updateReports() {
         }
     }
 }
+// =========================================
+// XỬ LÝ MODAL CẢNH BÁO TỒN KHO THẤP
+// =========================================
+let currentLowStockSearch = '';
 
+function showLowStockModal() {
+    currentLowStockSearch = '';
+    const searchInput = document.getElementById('search-low-stock-input');
+    if (searchInput) searchInput.value = '';
+    
+    renderLowStockModal();
+    document.getElementById('low-stock-details-modal').classList.add('active');
+}
+
+function handleSearchLowStock(e) {
+    currentLowStockSearch = removeAccents(e.target.value);
+    renderLowStockModal();
+}
+
+function renderLowStockModal() {
+    const tbody = document.getElementById('low-stock-details-body');
+    if (!tbody) return;
+    
+    // Lấy toàn bộ hàng hóa có tồn kho < 10
+    let lowStockItems = db_goods.filter(g => g.stock < 10).sort((a, b) => a.stock - b.stock);
+    
+    // Lọc theo thanh tìm kiếm
+    if (currentLowStockSearch) {
+        lowStockItems = lowStockItems.filter(g => removeAccents(g.name).includes(currentLowStockSearch));
+    }
+
+    tbody.innerHTML = '';
+    
+    if (lowStockItems.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:#888; padding: 20px;">Không có mặt hàng nào khớp tìm kiếm hoặc kho đang ổn định.</td></tr>';
+        return;
+    }
+
+    lowStockItems.forEach(g => {
+        tbody.innerHTML += `
+            <tr>
+                <td><strong>${g.name}</strong> <small style="color: #636e72;">(${g.unit})</small></td>
+                <td><span style="background: #f1f2f6; padding: 4px 8px; border-radius: 4px; font-size: 0.9rem;">${g.category}</span></td>
+                <td style="text-align: center; font-weight: bold; color: #d63031; background: #ffeaa7;">${g.stock}</td>
+            </tr>
+        `;
+    });
+}
 // =========================================
 // KHỞI TẠO BẰNG FIREBASE REAL-TIME Lắng Nghe
 // =========================================
@@ -1201,3 +1391,65 @@ const requestWakeLock = async () => {
 
 document.addEventListener('click', () => { if (!wakeLock || wakeLock.released) requestWakeLock(); }, { once: true });
 document.addEventListener('visibilitychange', async () => { if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock(); });
+// =========================================
+// HỆ THỐNG VẼ BIỂU ĐỒ DOANH THU (CHART.JS)
+// =========================================
+let revenueChartInstance = null;
+
+function renderRevenueChart(labels, data) {
+    const ctx = document.getElementById('revenueChart');
+    if (!ctx) return;
+
+    // Nếu đã có biểu đồ cũ thì hủy đi để vẽ cái mới đè lên
+    if (revenueChartInstance) {
+        revenueChartInstance.destroy();
+    }
+
+    revenueChartInstance = new Chart(ctx, {
+        type: 'bar', // Dạng biểu đồ cột
+        data: {
+            labels: labels, // Trục X (Tháng, Ngày, hoặc Giờ)
+            datasets: [{
+                label: 'Doanh thu (VNĐ)',
+                data: data, // Trục Y (Số tiền)
+                backgroundColor: 'rgba(9, 132, 227, 0.8)', // Màu xanh biển của hệ thống
+                hoverBackgroundColor: '#74b9ff',
+                borderRadius: 4, // Bo tròn nhẹ góc trên của cột
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }, // Ẩn cái chú thích thừa
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) { label += ': '; }
+                            if (context.parsed.y !== null) {
+                                // Định dạng lại tiền trong bảng tooltip khi di chuột vào cột
+                                label += new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(context.parsed.y);
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            // Rút gọn số tiền trên trục Y (1.000.000 -> 1Tr, 100.000 -> 100k)
+                            if (value >= 1000000) return (value / 1000000) + 'Tr';
+                            if (value >= 1000) return (value / 1000) + 'k';
+                            return value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}

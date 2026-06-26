@@ -2,12 +2,12 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="226 POS">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="226 POS">
 
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="theme-color" content="#2b343b">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2b343b">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản lý Cửa Hàng - 226 POS</title>
     <link rel="stylesheet" href="admin-style.css">
@@ -27,8 +27,8 @@
         <div class="admin-logo">
             <i class="fa-solid fa-chart-pie"></i> MANAGER 226
         </div>
-<ul class="admin-menu">
-<li class="menu-group">
+        <ul class="admin-menu">
+            <li class="menu-group">
                 <div class="menu-group-title" onclick="toggleSubMenu(this)">
                     <div><i class="fa-solid fa-box-open"></i> Danh sách hàng hóa</div>
                     <i class="fa-solid fa-chevron-down transition-icon" style="transform: rotate(0deg);"></i>
@@ -54,15 +54,15 @@
 
             <li onclick="switchManagerTab('reports', this)"><i class="fa-solid fa-chart-line"></i> Báo cáo tổng quan</li>
             
-<li style="margin-top: 50px;" onclick="window.location.href='index.html'"><i class="fa-solid fa-cash-register"></i> Về máy POS</li>
+            <li style="margin-top: 50px;" onclick="window.location.href='index.html'"><i class="fa-solid fa-cash-register"></i> Về máy POS</li>
         </ul>
     </aside>
 
     <main class="admin-content">
-<header class="admin-header">
-    <h2>Quản lý vận hành cửa hàng</h2>
-    <div class="admin-user"><i class="fa-solid fa-user-tie"></i> Quản lý viên</div>
-</header>
+        <header class="admin-header">
+            <h2>Quản lý vận hành cửa hàng</h2>
+            <div class="admin-user"><i class="fa-solid fa-user-tie"></i> Quản lý viên</div>
+        </header>
 
         <section id="categories-tab" class="admin-section">
             <div class="form-card">
@@ -116,7 +116,7 @@
 
         <section id="goods-tab" class="admin-section">
             <div class="list-card">
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Tồn kho hiện tại</h3>
                     <div>
                         <button class="btn-add" onclick="resetGoodsData()" style="background: #d63031; margin-right: 10px;"><i class="fa-solid fa-trash-can"></i> Xóa sạch toàn bộ kho</button>
@@ -129,7 +129,7 @@
                     <input type="text" placeholder="Tìm kiếm nguyên liệu (VD: thit bo, gao...)" oninput="handleSearchGood(event)">
                 </div>
 
-<table class="admin-table">
+                <table class="admin-table">
                     <thead>
                         <tr>
                             <th>Mã NL</th>
@@ -147,7 +147,7 @@
             </div>
         </section>
 
-<section id="invoices-tab" class="admin-section">
+        <section id="invoices-tab" class="admin-section">
             <div class="list-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Lịch sử hóa đơn</h3>
@@ -167,7 +167,7 @@
             </div>
         </section>
 
-<section id="imports-tab" class="admin-section">
+        <section id="imports-tab" class="admin-section">
             <div class="list-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Lịch sử nhập hàng</h3>
@@ -186,7 +186,7 @@
             </div>
         </section>
 
-<section id="audits-tab" class="admin-section">
+        <section id="audits-tab" class="admin-section">
             <div class="list-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Lịch sử kiểm kê kho</h3>
@@ -205,177 +205,237 @@
             </div>
         </section>
 
-<section id="reports-tab" class="admin-section">
-    <div class="report-cards">
-        <div class="stat-card">
-            <h4>Tổng doanh thu trong ngày</h4>
-            <div class="value" id="report-revenue" style="color: #0984e3;">0đ</div>
-        </div>
-        <div class="stat-card success">
-            <h4>Tổng số đơn hàng</h4>
-            <div class="value" id="report-orders" style="color: #00b894;">0</div>
-        </div>
-        <div class="stat-card warning">
-            <h4>Cảnh báo tồn kho thấp</h4>
-            <div class="value" id="report-low-stock" style="color: #d63031;">0 mục</div>
-        </div>
-    </div>
-    
-    <!-- Căn chỉnh Layout 2 cột cho báo cáo chi tiết -->
-    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
-        <div class="list-card" style="flex: 1; min-width: 300px;">
-            <h3 style="border-bottom: 2px solid #f1f2f6; padding-bottom: 10px; margin-bottom: 15px;"><i class="fa-solid fa-fire" style="color: #e17055;"></i> Top Món Bán Chạy Hôm Nay</h3>
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Tên món ăn / Đồ uống</th>
-                        <th style="text-align: center;">SL Đã Bán</th>
-                        <th style="text-align: right;">Mang lại</th>
-                    </tr>
-                </thead>
-                <tbody id="report-top-items">
-                    <tr><td colspan="3" style="text-align:center; color:#888;">Chưa có dữ liệu bán hàng</td></tr>
-                </tbody>
-            </table>
-        </div>
-        
-        <div class="list-card" style="flex: 1; min-width: 300px;">
-            <h3 style="border-bottom: 2px solid #f1f2f6; padding-bottom: 10px; margin-bottom: 15px;"><i class="fa-solid fa-boxes-stacked" style="color: #6c5ce7;"></i> Nguyên Liệu Sắp Hết</h3>
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Tên nguyên liệu</th>
-                        <th style="text-align: center;">Tồn kho</th>
-                    </tr>
-                </thead>
-                <tbody id="report-low-stock-list">
-                    <tr><td colspan="2" style="text-align:center; color:#888;">Kho hàng đang ổn định</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-</section>
-    </main>
-
-<div id="create-menu-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-menu-modal')">
-    <div class="mobile-modal-sheet" onclick="event.stopPropagation()">
-        <div class="mobile-modal-handle"></div>
-        
-        <div class="mobile-modal-header">
-            <h3 style="flex: 1;" id="menu-modal-title"><i class="fa-solid fa-burger"></i> Thêm món ăn / thức uống</h3>
-            <button class="mobile-close-btn" onclick="closeManagerModal('create-menu-modal')">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        
-<div class="mobile-modal-body" id="menu-modal-scroll-area">
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tên món</label>
-                <input type="text" id="menu-name" placeholder="VD: Trà sữa truyền thống..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-            </div>
-
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nhóm món</label>
-                <select id="menu-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-                    <option value="">-- Chọn nhóm --</option>
-                </select>
-            </div>
-
-            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: #f1f2f6; padding: 12px; border-radius: 8px;">
-                <input type="checkbox" id="menu-has-sizes" onchange="toggleMenuSizes()" style="width: 20px; height: 20px; cursor: pointer;">
-                <label for="menu-has-sizes" style="font-weight: 600; cursor: pointer; color: #2d3436; user-select: none;">Món này có nhiều Size (Size S, M, L...)</label>
-            </div>
-
-            <div id="menu-default-config">
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Giá bán mặc định (VNĐ)</label>
-                    <input type="number" id="menu-price" placeholder="VD: 45000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+        <section id="reports-tab" class="admin-section">
+            <div class="form-card" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Thời gian:</label>
+                    <select id="manager-report-time" onchange="handleManagerReportFilterChange()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
+                        <option value="today">Hôm nay</option>
+                        <option value="yesterday">Hôm qua</option>
+                        <option value="this_month">Tháng này</option>
+                        <option value="last_month">1 tháng trước</option>
+                        <option value="this_year">Năm nay</option>
+                        <option value="custom">Tùy chỉnh khoảng ngày...</option>
+                    </select>
                 </div>
-                <div style="margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <label style="font-weight: 600; color: #2d3436;"><i class="fa-solid fa-blender"></i> Định lượng công thức</label>
-                        <button type="button" onclick="addRecipeRow('recipe-container')" style="background: #00b894; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm NL</button>
+                
+                <div id="manager-report-custom-date" style="display: none; flex: 2; min-width: 250px; align-items: center; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Từ ngày:</label>
+                        <input type="date" id="manager-report-start" onchange="updateReports()" onclick="this.showPicker()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
                     </div>
-                    <div id="recipe-container" style="display: flex; flex-direction: column; gap: 10px; padding-right: 5px;"></div>
-                </div>
-            </div>
-
-            <div id="menu-sizes-config" style="display: none; margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <label style="font-weight: 600; color: #0984e3;"><i class="fa-solid fa-layer-group"></i> Quản lý các Size</label>
-                    <button type="button" onclick="addSizeBlock()" style="background: #0984e3; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm Size mới</button>
-                </div>
-                <div id="sizes-container" style="display: flex; flex-direction: column; gap: 15px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Đến ngày:</label>
+                        <input type="date" id="manager-report-end" onchange="updateReports()" onclick="this.showPicker()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
                     </div>
-            </div>
+                </div>
 
-            <button onclick="createMenuItem()" class="custom-modal-btn" style="width: 100%; padding: 15px; background: #0984e3; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
-                Lưu thông tin món
-            </button>
-        </div>
-    </div>
-</div>
-
-<div id="create-good-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-good-modal')">
-    <div class="mobile-modal-sheet" onclick="event.stopPropagation()">
-        <div class="mobile-modal-handle"></div>
-        
-        <div class="mobile-modal-header">
-            <h3 style="flex: 1;"><i class="fa-solid fa-boxes-stacked"></i> Thêm nguyên liệu</h3>
-            <button class="mobile-close-btn" onclick="closeManagerModal('create-good-modal')">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
-        </div>
-        
-        <div class="mobile-modal-body">
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tên mặt hàng</label>
-                <input type="text" id="good-name" placeholder="VD: Coca Cola, Sữa đặc..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-            </div>
-            
-            <div style="display: flex; gap: 15px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Đơn vị tính</label>
-                    <input type="text" id="good-unit" placeholder="VD: lon, kg..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-                </div>
-                <div style="flex: 1;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Giá vốn (VNĐ)</label>
-                    <input type="number" id="good-cost" placeholder="VD: 8000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-                </div>
-            </div>
-            
-            <div style="margin-bottom: 15px;">
-                <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nhóm Quản lý Kho</label>
-                <select id="good-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
-                    <option value="">-- Chọn nhóm phân loại kho --</option>
-                </select>
-            </div>
-            
-            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: #f1f2f6; padding: 12px; border-radius: 8px;">
-                <input type="checkbox" id="good-is-sellable" onchange="toggleGoodPriceInput()" style="width: 20px; height: 20px; cursor: pointer;">
-                <label for="good-is-sellable" style="font-weight: 600; cursor: pointer; color: #2d3436; user-select: none;">Cho phép bán trên POS</label>
-            </div>
-            
-            <div id="good-sell-fields" style="display: none; background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
-                <div style="margin-bottom: 10px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Giá bán lẻ tại POS (VNĐ)</label>
-                    <input type="number" id="good-price" placeholder="VD: 15000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; background: #fff; outline: none;">
-                </div>
-                <div>
-                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Nhóm hiển thị tại POS</label>
-                    <select id="good-pos-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; background: #fff; outline: none;">
-                        <option value="">-- Chọn nhóm tại POS --</option>
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Nhân viên (Thu ngân):</label>
+                    <select id="manager-report-cashier" onchange="updateReports()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
+                        <option value="all">-- Tất cả --</option>
                     </select>
                 </div>
             </div>
 
-            <button onclick="createGoodItem()" class="custom-modal-btn" style="width: 100%; padding: 15px; background: #0984e3; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
-                Lưu thông tin
-            </button>
+            <div class="report-cards">
+                <div class="stat-card">
+                    <h4>Tổng doanh thu</h4>
+                    <div class="value" id="report-revenue" style="color: #0984e3;">0đ</div>
+                </div>
+                <div class="stat-card success">
+                    <h4>Tổng số đơn hàng</h4>
+                    <div class="value" id="report-orders" style="color: #00b894;">0</div>
+                </div>
+                <div class="stat-card warning" onclick="showLowStockModal()" style="cursor: pointer; transition: transform 0.2s; box-shadow: 0 4px 10px rgba(214, 48, 49, 0.15);" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" title="Bấm vào để xem danh sách chi tiết">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h4>Cảnh báo tồn kho thấp</h4>
+                        <i class="fa-solid fa-arrow-up-right-from-square" style="color: #d63031; font-size: 0.9rem; opacity: 0.7;"></i>
+                    </div>
+                    <div class="value" id="report-low-stock" style="color: #d63031;">0 mục</div>
+                </div>
+            </div>
+
+            <div class="list-card" style="margin-top: 20px;">
+                <h3 style="margin-bottom: 15px; color: #2d3436;"><i class="fa-solid fa-chart-simple" style="color: #0984e3;"></i> Biểu đồ doanh thu</h3>
+                <div style="position: relative; height: 350px; width: 100%;">
+                    <canvas id="revenueChart"></canvas>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <div class="list-card">
+                    <h3 style="margin-bottom: 15px; color: #2d3436;"><i class="fa-solid fa-fire" style="color: #d63031;"></i> Top món bán chạy nhất</h3>
+                    <div style="overflow-x: auto;">
+                        <table class="admin-table" style="width: 100%; min-width: 500px;">
+                            <thead style="background: #f8f9fa;">
+                                <tr>
+                                    <th>Tên món / Thức uống</th>
+                                    <th style="text-align: center;">Số lượng đã bán</th>
+                                    <th style="text-align: right;">Doanh thu mang lại</th>
+                                </tr>
+                            </thead>
+                            <tbody id="report-top-items">
+                                </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <div id="low-stock-details-modal" class="mobile-modal-overlay" onclick="closeManagerModal('low-stock-details-modal')">
+        <div class="mobile-modal-sheet" style="max-height: 85vh; max-width: 700px; margin: 0 auto;" onclick="event.stopPropagation()">
+            <div class="mobile-modal-handle"></div>
+            <div class="mobile-modal-header">
+                <h3 style="flex: 1;"><i class="fa-solid fa-triangle-exclamation" style="color: #d63031;"></i> Danh sách hàng sắp hết (< 10)</h3>
+                <button class="mobile-close-btn" onclick="closeManagerModal('low-stock-details-modal')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-modal-body">
+                <div class="search-input-wrapper" style="margin-bottom: 15px;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-low-stock-input" placeholder="Tìm theo tên nguyên liệu..." oninput="handleSearchLowStock(event)">
+                </div>
+                
+                <div style="overflow-y: auto; border: 1px solid #dfe6e9; border-radius: 8px;">
+                    <table class="admin-table" style="width: 100%; margin: 0;">
+                        <thead style="position: sticky; top: 0; background: #f8f9fa; z-index: 1;">
+                            <tr>
+                                <th>Tên hàng hóa / Nguyên liệu</th>
+                                <th>Nhóm</th>
+                                <th style="text-align: center;">Tồn kho HT</th>
+                            </tr>
+                        </thead>
+                        <tbody id="low-stock-details-body">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
-</div>
-<div id="create-import-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-import-modal')">
+
+    <div id="create-menu-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-menu-modal')">
+        <div class="mobile-modal-sheet" onclick="event.stopPropagation()">
+            <div class="mobile-modal-handle"></div>
+            
+            <div class="mobile-modal-header">
+                <h3 style="flex: 1;" id="menu-modal-title"><i class="fa-solid fa-burger"></i> Thêm món ăn / thức uống</h3>
+                <button class="mobile-close-btn" onclick="closeManagerModal('create-menu-modal')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-modal-body" id="menu-modal-scroll-area">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tên món</label>
+                    <input type="text" id="menu-name" placeholder="VD: Trà sữa truyền thống..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                </div>
+
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nhóm món</label>
+                    <select id="menu-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                        <option value="">-- Chọn nhóm --</option>
+                    </select>
+                </div>
+
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: #f1f2f6; padding: 12px; border-radius: 8px;">
+                    <input type="checkbox" id="menu-has-sizes" onchange="toggleMenuSizes()" style="width: 20px; height: 20px; cursor: pointer;">
+                    <label for="menu-has-sizes" style="font-weight: 600; cursor: pointer; color: #2d3436; user-select: none;">Món này có nhiều Size (Size S, M, L...)</label>
+                </div>
+
+                <div id="menu-default-config">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Giá bán mặc định (VNĐ)</label>
+                        <input type="number" id="menu-price" placeholder="VD: 45000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                    </div>
+                    <div style="margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="font-weight: 600; color: #2d3436;"><i class="fa-solid fa-blender"></i> Định lượng công thức</label>
+                            <button type="button" onclick="addRecipeRow('recipe-container')" style="background: #00b894; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm NL</button>
+                        </div>
+                        <div id="recipe-container" style="display: flex; flex-direction: column; gap: 10px; padding-right: 5px;"></div>
+                    </div>
+                </div>
+
+                <div id="menu-sizes-config" style="display: none; margin-bottom: 25px; border-top: 1px solid #dfe6e9; padding-top: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <label style="font-weight: 600; color: #0984e3;"><i class="fa-solid fa-layer-group"></i> Quản lý các Size</label>
+                        <button type="button" onclick="addSizeBlock()" style="background: #0984e3; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;"><i class="fa-solid fa-plus"></i> Thêm Size mới</button>
+                    </div>
+                    <div id="sizes-container" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                </div>
+
+                <button onclick="createMenuItem()" class="custom-modal-btn" style="width: 100%; padding: 15px; background: #0984e3; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
+                    Lưu thông tin món
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-good-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-good-modal')">
+        <div class="mobile-modal-sheet" onclick="event.stopPropagation()">
+            <div class="mobile-modal-handle"></div>
+            
+            <div class="mobile-modal-header">
+                <h3 style="flex: 1;"><i class="fa-solid fa-boxes-stacked"></i> Thêm nguyên liệu</h3>
+                <button class="mobile-close-btn" onclick="closeManagerModal('create-good-modal')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="mobile-modal-body">
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Tên mặt hàng</label>
+                    <input type="text" id="good-name" placeholder="VD: Coca Cola, Sữa đặc..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                </div>
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Đơn vị tính</label>
+                        <input type="text" id="good-unit" placeholder="VD: lon, kg..." style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600;">Giá vốn (VNĐ)</label>
+                        <input type="number" id="good-cost" placeholder="VD: 8000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600;">Nhóm Quản lý Kho</label>
+                    <select id="good-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa;">
+                        <option value="">-- Chọn nhóm phân loại kho --</option>
+                    </select>
+                </div>
+                
+                <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px; background: #f1f2f6; padding: 12px; border-radius: 8px;">
+                    <input type="checkbox" id="good-is-sellable" onchange="toggleGoodPriceInput()" style="width: 20px; height: 20px; cursor: pointer;">
+                    <label for="good-is-sellable" style="font-weight: 600; cursor: pointer; color: #2d3436; user-select: none;">Cho phép bán trên POS</label>
+                </div>
+                
+                <div id="good-sell-fields" style="display: none; background: #e3f2fd; padding: 15px; border-radius: 8px; margin-bottom: 25px;">
+                    <div style="margin-bottom: 10px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Giá bán lẻ tại POS (VNĐ)</label>
+                        <input type="number" id="good-price" placeholder="VD: 15000" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; background: #fff; outline: none;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Nhóm hiển thị tại POS</label>
+                        <select id="good-pos-category" style="width: 100%; padding: 12px; border: 1px solid #dfe6e9; border-radius: 8px; background: #fff; outline: none;">
+                            <option value="">-- Chọn nhóm tại POS --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button onclick="createGoodItem()" class="custom-modal-btn" style="width: 100%; padding: 15px; background: #0984e3; color: white; border: none; border-radius: 12px; font-size: 1.1rem; font-weight: bold; cursor: pointer;">
+                    Lưu thông tin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="create-import-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-import-modal')">
         <div class="mobile-modal-sheet" style="max-height: 95vh; height: 95vh; max-width: 900px; margin: 0 auto; border-radius: 24px 24px 0 0;" onclick="event.stopPropagation()">
             <div class="mobile-modal-handle"></div>
             <div class="mobile-modal-header">
@@ -452,7 +512,8 @@
             </div>
         </div>
     </div>
-<div id="create-audit-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-audit-modal')">
+
+    <div id="create-audit-modal" class="mobile-modal-overlay" onclick="closeManagerModal('create-audit-modal')">
         <div class="mobile-modal-sheet" style="max-height: 90vh; height: 90vh; max-width: 800px; margin: 0 auto; border-radius: 24px 24px 0 0;" onclick="event.stopPropagation()">
             <div class="mobile-modal-handle"></div>
             <div class="mobile-modal-header">
@@ -470,8 +531,7 @@
                     <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #0984e3;"><i class="fa-solid fa-magnifying-glass"></i> Tìm & Thêm mặt hàng kiểm kê</label>
                     <input type="text" id="audit-item-search" autocomplete="off" oninput="handleAuditItemSearch(event)" placeholder="Gõ tên hàng hóa (VD: duong, da, thit...)" style="width: 100%; padding: 12px; border: 2px solid #0984e3; border-radius: 8px; outline: none; font-size: 1.05rem;">
                     
-                    <div id="audit-item-suggestions" style="position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #dfe6e9; border-radius: 8px; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 10px 20px rgba(0,0,0,0.15);">
-                        </div>
+                    <div id="audit-item-suggestions" style="position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid #dfe6e9; border-radius: 8px; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 10px 20px rgba(0,0,0,0.15);"></div>
                 </div>
 
                 <div style="flex: 1; overflow-y: auto; border: 1px solid #dfe6e9; border-radius: 8px; margin-bottom: 20px;">
@@ -485,8 +545,7 @@
                                 <th style="width: 10%;"></th>
                             </tr>
                         </thead>
-                        <tbody id="audit-items-tbody">
-                            </tbody>
+                        <tbody id="audit-items-tbody"></tbody>
                     </table>
                 </div>
 
@@ -519,7 +578,8 @@
             </div>
         </div>
     </div>
-<div id="edit-invoice-modal" class="mobile-modal-overlay" onclick="closeManagerModal('edit-invoice-modal')">
+
+    <div id="edit-invoice-modal" class="mobile-modal-overlay" onclick="closeManagerModal('edit-invoice-modal')">
         <div class="mobile-modal-sheet" style="max-height: 95vh; height: 95vh; max-width: 900px; margin: 0 auto; border-radius: 24px 24px 0 0;" onclick="event.stopPropagation()">
             <div class="mobile-modal-handle"></div>
             <div class="mobile-modal-header">
@@ -560,9 +620,11 @@
             </div>
         </div>
     </div>
-<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script src="firebase-init.js"></script>
     <script src="manager-script.js"></script>
