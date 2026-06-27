@@ -364,22 +364,26 @@ function clearOrder() {
         }, 'Hủy đơn hàng');
     }
 }
-
-
-
-
-
 function checkout() {
+    // === 0. KIỂM TRA ĐƠN HÀNG TRỐNG ===
     if (currentOrder.length === 0) {
         AppModal.alert('Vui lòng chọn ít nhất một món để thanh toán.', 'warning', 'Đơn hàng trống');
         return;
     }
+
+    // --- 1. CHỐNG SPAM: Khóa tạm thời nút thanh toán ---
+    const payBtn = document.querySelector('.btn-pay');
+    const originalBtnText = payBtn ? payBtn.innerHTML : '';
+    if (payBtn) {
+        payBtn.disabled = true;
+        payBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Đang xử lý...';
+        payBtn.style.opacity = '0.7';
+    }
     
-    // === 1. XỬ LÝ TỰ ĐỘNG TRỪ TỒN KHO NGUYÊN LIỆU ===
+    // === 2. XỬ LÝ TỰ ĐỘNG TRỪ TỒN KHO NGUYÊN LIỆU ===
     let goods = [...pos_goods]; 
     
     currentOrder.forEach(orderItem => {
-        // Cách mới Tối ưu hóa: Dùng trực tiếp bộ "ingredients" đã được chốt (theo size) ngay lúc bấm thêm món
         if (orderItem.ingredients && orderItem.ingredients.length > 0) {
             orderItem.ingredients.forEach(ing => {
                 const goodIndex = goods.findIndex(g => g.id === ing.id);
@@ -389,7 +393,6 @@ function checkout() {
                 }
             });
         } 
-        // Xử lý các món hàng bán lẻ trực tiếp (Thuốc lá, chai nước...)
         else if (orderItem.id.startsWith("NL") || (orderItem.baseId && orderItem.baseId.startsWith("NL"))) {
             const searchId = orderItem.baseId || orderItem.id;
             const goodIndex = goods.findIndex(g => g.id === searchId);
@@ -402,12 +405,12 @@ function checkout() {
 
     saveToFirebase('goodsData', goods);
 
-    // === 2. LƯU HÓA ĐƠN VÀO CLOUD ===
+    // === 3. LƯU HÓA ĐƠN VÀO CLOUD ===
     let rawTotal = currentOrder.reduce((sum, item) => sum + (item.price * item.qty), 0);
     let invoices = [...pos_invoices]; 
     
     const d = new Date();
-const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
     const newInvoice = {
@@ -423,12 +426,30 @@ const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')
     invoices.push(newInvoice);
     saveToFirebase('invoicesData', invoices);
 
-    // === 3. THÔNG BÁO ===
+    // === 4. LÀM SẠCH UI VÀ TỰ ĐỘNG ĐÓNG GIỎ HÀNG TRƯỚC ===
     const totalPrice = document.getElementById('total-price').innerText;
-    AppModal.alert(`Đã nhận: <b style="font-size:1.3em; color:#00b894;">${totalPrice}</b><br><br>Hóa đơn đã được đồng bộ lên Cloud.<br><small style="color:#636e72;">Đã cập nhật tự động trừ kho nguyên liệu theo Size.</small>`, 'success', 'Thanh toán thành công', () => {
-        currentOrder = [];
-        updateOrderUI();
-    });
+    
+    // Ép đóng giỏ hàng trên mobile (nếu đang mở) để nhường chỗ cho thông báo
+    const orderArea = document.querySelector('.order-area');
+    if (orderArea && orderArea.classList.contains('show')) {
+        orderArea.classList.remove('show');
+        document.body.style.overflow = '';
+    }
+
+    // Làm sạch dữ liệu giỏ hàng ngay lập tức
+    currentOrder = [];
+    updateOrderUI();
+
+    // Phục hồi lại trạng thái nút thanh toán
+    if (payBtn) {
+        payBtn.disabled = false;
+        payBtn.innerHTML = originalBtnText;
+        payBtn.style.opacity = '1';
+    }
+
+    // === 5. HIỂN THỊ THÔNG BÁO ===
+    // Đặt dòng này ở cuối cùng đảm bảo giỏ hàng đã thụt vào trong rồi thì cái bảng báo thành công mới nảy ra
+    AppModal.alert(`Đã nhận: <b style="font-size:1.3em; color:#00b894;">${totalPrice}</b><br><br>Hóa đơn đã được đồng bộ lên Cloud.<br><small style="color:#636e72;">Đã cập nhật tự động trừ kho nguyên liệu.</small>`, 'success', 'Thanh toán thành công');
 }
 document.addEventListener('keydown', function(e) {
     if (e.key === 'F9') { e.preventDefault(); checkout(); }
