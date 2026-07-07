@@ -1361,9 +1361,45 @@ document.addEventListener('DOMContentLoaded', () => {
         updateReports(); // Cập nhật lại chỉ số cảnh báo tồn kho
     });
     
-    listenToFirebase('importsData', (data) => { if (data) db_imports = data; else db_imports = []; renderImports(); });
+// Cờ đánh dấu để không bị báo cáo dội lại khi vừa F5 tải lại trang
+    let isInitLoad = { imports: true, audits: true };
+
+    // 1. Lắng nghe và Báo cáo khi có Phiếu Nhập Hàng mới
+    listenToFirebase('importsData', (data) => { 
+        if (data) {
+            // Nếu không phải lần tải đầu và phát hiện số lượng phiếu tăng lên
+            if (!isInitLoad.imports && data.length > db_imports.length) {
+                const newImport = data[data.length - 1]; // Lấy phiếu vừa tạo
+                pushChromeAlert(
+                    "📦 PHIẾU NHẬP HÀNG MỚI", 
+                    `Nhà cung cấp: ${newImport.supplier}\nTổng tiền: ${formatMoney(newImport.total)}\nGhi chú: ${newImport.note || 'Không'}`
+                );
+            }
+            db_imports = data; 
+        } else { 
+            db_imports = []; 
+        }
+        isInitLoad.imports = false;
+        renderImports(); 
+    });
     
-    listenToFirebase('auditsData', (data) => { if (data) db_audits = data; else db_audits = []; renderAudits(); });
+    // 2. Lắng nghe và Báo cáo khi có Phiếu Kiểm Kho mới
+    listenToFirebase('auditsData', (data) => { 
+        if (data) {
+            if (!isInitLoad.audits && data.length > db_audits.length) {
+                const newAudit = data[data.length - 1];
+                pushChromeAlert(
+                    "📋 PHIẾU KIỂM KHO MỚI", 
+                    `Người kiểm: ${newAudit.checker}\nCó ${newAudit.details.length} mặt hàng được cập nhật tồn kho.\nGhi chú: ${newAudit.note}`
+                );
+            }
+            db_audits = data; 
+        } else { 
+            db_audits = []; 
+        }
+        isInitLoad.audits = false;
+        renderAudits(); 
+    });
     
     listenToFirebase('invoicesData', (data) => { 
         if (data) db_invoices = data; else db_invoices = []; 
@@ -1452,4 +1488,28 @@ function renderRevenueChart(labels, data) {
             }
         }
     });
+}
+// =========================================
+// HỆ THỐNG THÔNG BÁO TỪ TRÌNH DUYỆT CHROME
+// =========================================
+
+// Xin quyền bật thông báo Chrome khi Quản lý mở trang
+if ("Notification" in window) {
+    if (Notification.permission !== "granted" && Notification.permission !== "denied") {
+        Notification.requestPermission();
+    }
+}
+
+// Hàm đẩy Popup thông báo ra góc màn hình
+function pushChromeAlert(title, body) {
+    if (Notification.permission === "granted") {
+        const notification = new Notification(title, {
+            body: body,
+            icon: "https://cdn-icons-png.flaticon.com/512/3143/3143460.png", // Icon giỏ hàng/thông báo
+            silent: false // Bật âm thanh ting ting mặc định của máy
+        });
+        
+        // Tự động đóng popup sau 7 giây để không làm rác màn hình
+        setTimeout(() => { notification.close(); }, 7000);
+    }
 }
