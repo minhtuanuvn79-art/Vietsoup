@@ -50,10 +50,39 @@ window.saveToFirebase = function(docName, dataArray) {
         });
 }
 
-// Hàm LẮNG NGHE Real-time (Đã nâng cấp cách ly)
+// Hàm LẮNG NGHE Real-time (Đã nâng cấp cách ly và Tách Hóa Đơn lẻ)
+// Hàm LẮNG NGHE Real-time (Đã nâng cấp cách ly và Tách Hóa Đơn lẻ)
 window.listenToFirebase = function(docName, callback) {
     const finalDocName = getBranchDocName(docName);
     
+    // Xử lý riêng cho Hóa Đơn (Tải dữ liệu từ Collection)
+    if (docName === 'invoicesData') {
+        db.collection("pos_invoices").onSnapshot((snapshot) => {
+            let items = [];
+            snapshot.forEach((doc) => {
+                items.push(doc.data());
+            });
+
+            // --- BỔ SUNG: TỰ ĐỘNG SẮP XẾP LẠI THEO THỜI GIAN (CŨ -> MỚI) ---
+            items.sort((a, b) => {
+                // Chuẩn hóa định dạng ngày (Xử lý cả HĐ cũ dùng DD/MM/YYYY và HĐ mới dùng YYYY-MM-DD)
+                let dateA = a.date.includes('/') ? a.date.split('/').reverse().join('-') : a.date;
+                let dateB = b.date.includes('/') ? b.date.split('/').reverse().join('-') : b.date;
+                
+                const timeA = a.time || "00:00";
+                const timeB = b.time || "00:00";
+                
+                // Gộp thành chuỗi chuẩn "YYYY-MM-DD HH:MM" để so sánh thời gian chính xác
+                return (dateA + " " + timeA).localeCompare(dateB + " " + timeB);
+            });
+            // ---------------------------------------------------------------
+
+            callback(items);
+        });
+        return; 
+    }
+
+    // GIỮ NGUYÊN CODE CŨ: Cho các dữ liệu nhẹ như Thực đơn, Nhóm, Kho...
     db.collection("pos_226").doc(finalDocName).onSnapshot((doc) => {
         if (doc.exists) {
             callback(doc.data().items);
@@ -61,4 +90,28 @@ window.listenToFirebase = function(docName, callback) {
             callback(null); // Document chưa tồn tại
         }
     });
+}
+
+// HỆ THỐNG LƯU AN TOÀN TUYỆT ĐỐI (CHỐNG GHI ĐÈ ĐỒNG THỜI)
+window.safeUpdateFirebase = async function(docName, updateLogicCallback) {
+    const finalDocName = getBranchDocName(docName);
+    const docRef = db.collection("pos_226").doc(finalDocName);
+
+    try {
+        await db.runTransaction(async (transaction) => {
+            const doc = await transaction.get(docRef);
+            // Lấy mảng dữ liệu MỚI NHẤT từ Server (không dùng mảng dưới máy tính)
+            let currentItems = doc.exists ? (doc.data().items || []) : [];
+
+            // Chạy logic sửa/xóa/thêm của bạn trên mảng mới nhất này
+            const updatedItems = updateLogicCallback(currentItems);
+
+            // Ghi lại mảng đã cập nhật
+            transaction.set(docRef, { items: updatedItems }, { merge: true });
+        });
+        console.log(`[Firebase] Đã lưu an toàn (Transaction) ${finalDocName}!`);
+    } catch (error) {
+        alert(`LỖI LƯU DỮ LIỆU ĐỒNG THỜI (${finalDocName}): \n\n${error.message}`);
+        console.error("Transaction failed: ", error);
+    }
 }

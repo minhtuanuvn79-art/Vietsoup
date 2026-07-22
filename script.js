@@ -364,7 +364,7 @@ function clearOrder() {
         }, 'Hủy đơn hàng');
     }
 }
-function checkout() {
+async function checkout() {
     // === 0. KIỂM TRA ĐƠN HÀNG TRỐNG ===
     if (currentOrder.length === 0) {
         AppModal.alert('Vui lòng chọn ít nhất một món để thanh toán.', 'warning', 'Đơn hàng trống');
@@ -380,35 +380,8 @@ function checkout() {
         payBtn.style.opacity = '0.7';
     }
     
-    // === 2. XỬ LÝ TỰ ĐỘNG TRỪ TỒN KHO NGUYÊN LIỆU ===
-    let goods = [...pos_goods]; 
-    
-    currentOrder.forEach(orderItem => {
-        if (orderItem.ingredients && orderItem.ingredients.length > 0) {
-            orderItem.ingredients.forEach(ing => {
-                const goodIndex = goods.findIndex(g => g.id === ing.id);
-                if (goodIndex > -1) {
-                    goods[goodIndex].stock -= (ing.qty * orderItem.qty);
-                    goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
-                }
-            });
-        } 
-        else if (orderItem.id.startsWith("NL") || (orderItem.baseId && orderItem.baseId.startsWith("NL"))) {
-            const searchId = orderItem.baseId || orderItem.id;
-            const goodIndex = goods.findIndex(g => g.id === searchId);
-            if (goodIndex > -1) {
-                goods[goodIndex].stock -= orderItem.qty;
-                goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
-            }
-        }
-    });
-
-    saveToFirebase('goodsData', goods);
-
-    // === 3. LƯU HÓA ĐƠN VÀO CLOUD ===
+    // === 2. CHUẨN BỊ DỮ LIỆU HÓA ĐƠN MỚI ===
     let rawTotal = currentOrder.reduce((sum, item) => sum + (item.price * item.qty), 0);
-    let invoices = [...pos_invoices]; 
-    
     const d = new Date();
     const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     const timeStr = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
@@ -422,34 +395,77 @@ function checkout() {
         total: rawTotal,
         items: [...currentOrder] 
     };
-    
-    invoices.push(newInvoice);
-    saveToFirebase('invoicesData', invoices);
 
-    // === 4. LÀM SẠCH UI VÀ TỰ ĐỘNG ĐÓNG GIỎ HÀNG TRƯỚC ===
-    const totalPrice = document.getElementById('total-price').innerText;
-    
-    // Ép đóng giỏ hàng trên mobile (nếu đang mở) để nhường chỗ cho thông báo
-    const orderArea = document.querySelector('.order-area');
-    if (orderArea && orderArea.classList.contains('show')) {
-        orderArea.classList.remove('show');
-        document.body.style.overflow = '';
+    try {
+        // === 3. XỬ LÝ LƯU CLOUD AN TOÀN (CHỐNG GHI ĐÈ & RACE CONDITION) ===
+        // Lấy tên document cho kho hàng (hỗ trợ phân chi nhánh)
+        const goodsDocName = typeof getBranchDocName === 'function' ? getBranchDocName('goodsData') : 'goodsData';
+
+        // Xử lý tự động trừ tồn kho nguyên liệu (Giữ nguyên logic cũ)
+        let goods = [...pos_goods]; 
+        currentOrder.forEach(orderItem => {
+            if (orderItem.ingredients && orderItem.ingredients.length > 0) {
+                orderItem.ingredients.forEach(ing => {
+                    const goodIndex = goods.findIndex(g => g.id === ing.id);
+                    if (goodIndex > -1) {
+                        goods[goodIndex].stock -= (ing.qty * orderItem.qty);
+                        goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
+                    }
+                });
+            } 
+            else if (orderItem.id.startsWith("NL") || (orderItem.baseId && orderItem.baseId.startsWith("NL"))) {
+                const searchId = orderItem.baseId || orderItem.id;
+                const goodIndex = goods.findIndex(g => g.id === searchId);
+                if (goodIndex > -1) {
+                    goods[goodIndex].stock -= orderItem.qty;
+                    goods[goodIndex].stock = Math.round(goods[goodIndex].stock * 100) / 100;
+                }
+            }
+        });
+
+        // Sử dụng Batch để ghi cả Hóa Đơn và Tồn Kho cùng 1 lúc
+        const batch = db.batch();
+        
+        // [CẬP NHẬT QUAN TRỌNG]: Lưu vào collection mới 'pos_invoices' và tạo file với tên là ID hóa đơn
+        const invoiceRef = db.collection("pos_invoices").doc(newInvoice.id);
+        const goodsRef = db.collection("pos_226").doc(goodsDocName);
+
+        // Lưu toàn bộ dữ liệu Hóa đơn này vào file đó
+        batch.set(invoiceRef, newInvoice);
+        
+        // Cập nhật lại kho hàng
+        batch.set(goodsRef, { items: goods });
+
+        // Đẩy lệnh thực thi lên Firebase
+        await batch.commit();
+
+        // === 4. LÀM SẠCH UI VÀ TỰ ĐỘNG ĐÓNG GIỎ HÀNG ===
+        const totalPrice = document.getElementById('total-price').innerText;
+        
+        const orderArea = document.querySelector('.order-area');
+        if (orderArea && orderArea.classList.contains('show')) {
+            orderArea.classList.remove('show');
+            document.body.style.overflow = '';
+        }
+
+        // Xóa giỏ hàng
+        currentOrder = [];
+        updateOrderUI();
+
+        // === 5. HIỂN THỊ THÔNG BÁO ===
+        AppModal.alert(`Đã nhận: <b style="font-size:1.3em; color:#00b894;">${totalPrice}</b><br><br>Hóa đơn đã được đồng bộ lên Cloud.<br><small style="color:#636e72;">Đã cập nhật tự động trừ kho nguyên liệu.</small>`, 'success', 'Thanh toán thành công');
+
+    } catch (error) {
+        console.error("Lỗi khi thanh toán: ", error);
+        AppModal.alert('Có lỗi xảy ra khi đồng bộ lên Cloud. Vui lòng kiểm tra mạng và thử lại!<br>Chi tiết lỗi: ' + error.message, 'error', 'Lỗi Thanh Toán');
+    } finally {
+        // Luôn luôn mở khóa lại nút bấm bất kể thành công hay bị lỗi mạng
+        if (payBtn) {
+            payBtn.disabled = false;
+            payBtn.innerHTML = originalBtnText;
+            payBtn.style.opacity = '1';
+        }
     }
-
-    // Làm sạch dữ liệu giỏ hàng ngay lập tức
-    currentOrder = [];
-    updateOrderUI();
-
-    // Phục hồi lại trạng thái nút thanh toán
-    if (payBtn) {
-        payBtn.disabled = false;
-        payBtn.innerHTML = originalBtnText;
-        payBtn.style.opacity = '1';
-    }
-
-    // === 5. HIỂN THỊ THÔNG BÁO ===
-    // Đặt dòng này ở cuối cùng đảm bảo giỏ hàng đã thụt vào trong rồi thì cái bảng báo thành công mới nảy ra
-    AppModal.alert(`Đã nhận: <b style="font-size:1.3em; color:#00b894;">${totalPrice}</b><br><br>Hóa đơn đã được đồng bộ lên Cloud.<br><small style="color:#636e72;">Đã cập nhật tự động trừ kho nguyên liệu.</small>`, 'success', 'Thanh toán thành công');
 }
 document.addEventListener('keydown', function(e) {
     if (e.key === 'F9') { e.preventDefault(); checkout(); }

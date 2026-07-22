@@ -147,7 +147,42 @@
             </div>
         </section>
 
-        <section id="invoices-tab" class="admin-section">
+<section id="invoices-tab" class="admin-section">
+            <!-- BẮT ĐẦU: KHU VỰC BỘ LỌC HÓA ĐƠN -->
+            <div class="form-card" style="margin-bottom: 20px; display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);">
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Thời gian:</label>
+                    <select id="invoice-filter-time" onchange="handleInvoiceFilterChange()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
+                        <option value="all">Tất cả thời gian</option>
+                        <option value="today">Hôm nay</option>
+                        <option value="yesterday">Hôm qua</option>
+                        <option value="this_month">Tháng này</option>
+                        <option value="last_month">1 tháng trước</option>
+                        <option value="this_year">Năm nay</option>
+                        <option value="custom">Tùy chỉnh khoảng ngày...</option>
+                    </select>
+                </div>
+                
+                <div id="invoice-filter-custom-date" style="display: none; flex: 2; min-width: 250px; align-items: center; gap: 10px;">
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Từ ngày:</label>
+                        <input type="date" id="invoice-filter-start" onchange="applyInvoiceFilters()" onclick="this.showPicker()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Đến ngày:</label>
+                        <input type="date" id="invoice-filter-end" onchange="applyInvoiceFilters()" onclick="this.showPicker()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
+                    </div>
+                </div>
+
+                <div style="flex: 1; min-width: 150px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #2d3436;">Nhân viên (Thu ngân):</label>
+                    <select id="invoice-filter-cashier" onchange="applyInvoiceFilters()" style="width: 100%; padding: 10px; border: 1px solid #dfe6e9; border-radius: 8px; outline: none; background: #f8f9fa; cursor: pointer;">
+                        <option value="all">-- Tất cả --</option>
+                    </select>
+                </div>
+            </div>
+            <!-- KẾT THÚC: KHU VỰC BỘ LỌC -->
+
             <div class="list-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                     <h3 style="margin: 0;">Lịch sử hóa đơn</h3>
@@ -155,7 +190,7 @@
 
                 <div class="search-input-wrapper">
                     <i class="fa-solid fa-magnifying-glass"></i>
-                    <input type="text" placeholder="Tìm theo tên món ăn, mã HĐ hoặc tên thu ngân (VD: tra sua, com suon...)" oninput="handleSearchInvoice(event)">
+                    <input type="text" id="invoice-search-input" placeholder="Tìm theo tên món ăn hoặc mã HĐ..." oninput="handleSearchInvoice(event)">
                 </div>
 
                 <table class="admin-table">

@@ -876,25 +876,112 @@ let editInvoiceItemsArr = [];
 let managerInvoiceCurrentPage = 1;
 const MANAGER_INVOICE_PAGE_SIZE = 50;
 
-function handleSearchInvoice(e) { currentSearchInvoice = e.target.value; managerInvoiceCurrentPage = 1; renderInvoices(); }
+function handleSearchInvoice(e) { 
+    currentSearchInvoice = e.target.value; 
+    applyInvoiceFilters(); 
+}
+
+// Ẩn/hiện chọn ngày tùy chỉnh
+function handleInvoiceFilterChange() {
+    const timeFilter = document.getElementById('invoice-filter-time').value;
+    const customDateDiv = document.getElementById('invoice-filter-custom-date');
+    if (timeFilter === 'custom') {
+        customDateDiv.style.display = 'flex';
+    } else {
+        customDateDiv.style.display = 'none';
+    }
+    applyInvoiceFilters();
+}
+
+// Hàm trung gian để đưa trang về số 1 mỗi khi đổi bộ lọc
+function applyInvoiceFilters() {
+    managerInvoiceCurrentPage = 1;
+    renderInvoices();
+}
 
 function renderInvoices() {
     const tbody = document.getElementById('invoices-list-body');
     const paginationContainer = document.getElementById('manager-invoice-pagination');
     if (!tbody) return; tbody.innerHTML = ''; if (paginationContainer) paginationContainer.innerHTML = '';
     
-    // Sử dụng mảng toàn cục db_invoices đã được đồng bộ từ Firebase
-    let filteredInvoices = db_invoices;
-    
-    if (currentSearchInvoice.trim() !== '') {
-        const query = removeAccents(currentSearchInvoice);
-        filteredInvoices = filteredInvoices.filter(inv => removeAccents(inv.id).includes(query) || removeAccents(inv.cashier).includes(query) || (inv.items && inv.items.some(item => removeAccents(item.name).includes(query))));
+    // 1. Tự động cập nhật danh sách Thu ngân vào ô Dropdown (giống bên trang báo cáo)
+    const cashierSelect = document.getElementById('invoice-filter-cashier');
+    if (cashierSelect) {
+        const uniqueCashiers = [...new Set(db_invoices.map(inv => inv.cashier))].filter(Boolean);
+        const currentSelected = cashierSelect.value;
+        
+        cashierSelect.innerHTML = '<option value="all">-- Tất cả --</option>';
+        uniqueCashiers.forEach(c => {
+            cashierSelect.innerHTML += `<option value="${c}">${c}</option>`;
+        });
+        if (uniqueCashiers.includes(currentSelected)) {
+            cashierSelect.value = currentSelected;
+        }
     }
 
+    // 2. Lấy dữ liệu từ bộ lọc UI
+    const timeFilter = document.getElementById('invoice-filter-time')?.value || 'all';
+    const cashierFilter = document.getElementById('invoice-filter-cashier')?.value || 'all';
+    
+    let startDate = '';
+    let endDate = '';
+    const todayObj = new Date();
+    const formatDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    if (timeFilter === 'today') {
+        startDate = endDate = formatDate(todayObj);
+    } else if (timeFilter === 'yesterday') {
+        const yesterday = new Date(todayObj); yesterday.setDate(yesterday.getDate() - 1);
+        startDate = endDate = formatDate(yesterday);
+    } else if (timeFilter === 'this_month') {
+        startDate = `${todayObj.getFullYear()}-${String(todayObj.getMonth() + 1).padStart(2, '0')}-01`;
+        endDate = formatDate(todayObj);
+    } else if (timeFilter === 'last_month') {
+        const lastMonth = new Date(todayObj.getFullYear(), todayObj.getMonth() - 1, 1);
+        const endOfLastMonth = new Date(todayObj.getFullYear(), todayObj.getMonth(), 0);
+        startDate = formatDate(lastMonth); endDate = formatDate(endOfLastMonth);
+    } else if (timeFilter === 'this_year') {
+        startDate = `${todayObj.getFullYear()}-01-01`; endDate = formatDate(todayObj);
+    } else if (timeFilter === 'custom') {
+        startDate = document.getElementById('invoice-filter-start').value;
+        endDate = document.getElementById('invoice-filter-end').value;
+    }
+
+    // 3. Tiến hành xử lý lọc dữ liệu mảng
+    let filteredInvoices = db_invoices.filter(inv => {
+        // Lọc theo Thu ngân
+        if (cashierFilter !== 'all' && inv.cashier !== cashierFilter) return false;
+
+        // Lọc theo Thời gian (Nếu không chọn 'all')
+        if (timeFilter !== 'all') {
+            let invDate = inv.date;
+            // Chuẩn hóa định dạng ngày cũ về dạng YYYY-MM-DD để dễ so sánh
+            if (invDate.includes('/')) {
+                const parts = invDate.split('/');
+                invDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+            }
+            if (startDate && invDate < startDate) return false;
+            if (endDate && invDate > endDate) return false;
+        }
+
+        // Lọc theo Thanh tìm kiếm (Tìm từ khóa)
+        if (currentSearchInvoice.trim() !== '') {
+            const query = removeAccents(currentSearchInvoice);
+            const isMatch = removeAccents(inv.id).includes(query) || 
+                            removeAccents(inv.cashier).includes(query) || 
+                            (inv.items && inv.items.some(item => removeAccents(item.name).includes(query)));
+            if (!isMatch) return false;
+        }
+
+        return true;
+    });
+
+    // 4. Kết thúc: Đưa ra bảng hiển thị
     if (filteredInvoices.length === 0) return tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#888;">Không tìm thấy hóa đơn</td></tr>';
 
-    const sortedInvoices = [...filteredInvoices].reverse();
+    const sortedInvoices = [...filteredInvoices].reverse(); // Đảo ngược: Mới nhất lên đầu
     const totalPages = Math.ceil(sortedInvoices.length / MANAGER_INVOICE_PAGE_SIZE);
+    
     if (managerInvoiceCurrentPage > totalPages) managerInvoiceCurrentPage = totalPages;
     if (managerInvoiceCurrentPage < 1) managerInvoiceCurrentPage = 1;
 
@@ -905,10 +992,10 @@ function renderInvoices() {
         tbody.innerHTML += `<tr>
             <td><strong>${inv.id}</strong>${itemText}</td><td>${inv.date} ${inv.time || ''}</td><td>${inv.cashier} <small style="color:#0984e3;">(${inv.branch})</small></td>
             <td style="color:#00b894; font-weight:bold;">${Number(inv.total).toLocaleString('vi-VN')}đ</td>
-<td>
-    <button onclick="openEditInvoiceModal('${inv.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Sửa HĐ"><i class="fa-solid fa-pen"></i></button>
-    <button onclick="deleteInvoice('${inv.id}')" style="background:#d63031; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Xóa HĐ"><i class="fa-solid fa-trash"></i></button>
-</td>
+            <td>
+                <button onclick="openEditInvoiceModal('${inv.id}')" style="background:#0984e3; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer; margin-right:5px;" title="Sửa HĐ"><i class="fa-solid fa-pen"></i></button>
+                <button onclick="deleteInvoice('${inv.id}')" style="background:#d63031; color:#fff; border:none; padding:5px 10px; border-radius:4px; cursor:pointer;" title="Xóa HĐ"><i class="fa-solid fa-trash"></i></button>
+            </td>
             </tr>`;
     });
 
@@ -920,7 +1007,6 @@ function renderInvoices() {
         `;
     }
 }
-
 function goToManagerInvoicePage(page) { managerInvoiceCurrentPage = page; renderInvoices(); }
 function jumpToManagerInvoicePage(val, totalPages) { const p = parseInt(val); if(p >= 1 && p <= totalPages) { managerInvoiceCurrentPage = p; renderInvoices(); } }
 
@@ -1015,7 +1101,7 @@ function processInvoiceStock(itemsArray, isRollback) {
     });
 }
 
-function submitInvoiceEdit() {
+async function submitInvoiceEdit() {
     if (editInvoiceItemsArr.length === 0) return AppModal.alert("Hóa đơn phải có ít nhất 1 món!", "warning");
 
     const invoices = db_invoices;
@@ -1023,44 +1109,85 @@ function submitInvoiceEdit() {
     if (invIndex === -1) return;
     const oldInv = invoices[invIndex];
 
-    processInvoiceStock(oldInv.items, true);
-    processInvoiceStock(editInvoiceItemsArr, false);
+    // 1. Tính toán bù trừ kho (Cập nhật mảng db_goods cục bộ trước)
+    processInvoiceStock(oldInv.items, true); // Hoàn trả lại số lượng của các món cũ
+    processInvoiceStock(editInvoiceItemsArr, false); // Trừ đi số lượng của các món mới sửa
 
-    saveToFirebase('goodsData', db_goods);
-    
-    invoices[invIndex].items = editInvoiceItemsArr;
-    invoices[invIndex].total = parseFloat(document.getElementById('edit-inv-grand-total').getAttribute('data-val'));
-    
-    saveToFirebase('invoicesData', invoices);
+    const updatedTotal = parseFloat(document.getElementById('edit-inv-grand-total').getAttribute('data-val'));
 
-    AppModal.alert("Đã cập nhật hóa đơn và BÙ TRỪ KHO NGUYÊN LIỆU thành công!", "success");
-    closeManagerModal('edit-invoice-modal');
-    renderGoods(); renderInvoices();
+    try {
+        // 2. Dùng Batch để ghi đồng thời, chống lệch dữ liệu giữa Kho và Hóa đơn
+        const batch = db.batch();
+        
+        // CẬP NHẬT MỚI: Trỏ đến đích danh file Hóa đơn cụ thể trong collection pos_invoices
+        const invoiceRef = db.collection("pos_invoices").doc(editingInvoiceId);
+        batch.update(invoiceRef, {
+            items: editInvoiceItemsArr,
+            total: updatedTotal
+        });
+
+        // Tham chiếu đến file lưu Kho hàng
+        const goodsDocName = typeof getBranchDocName === 'function' ? getBranchDocName('goodsData') : 'goodsData';
+        const goodsRef = db.collection("pos_226").doc(goodsDocName);
+        batch.set(goodsRef, { items: db_goods });
+
+        // Đẩy toàn bộ lệnh lên Cloud Firebase
+        await batch.commit();
+
+        AppModal.alert("Đã cập nhật hóa đơn và BÙ TRỪ KHO NGUYÊN LIỆU thành công!", "success");
+        closeManagerModal('edit-invoice-modal');
+        
+        // Cập nhật lại giao diện (Hóa đơn sẽ tự động nhảy số liệu nhờ hàm Lắng nghe Real-time)
+        renderGoods(); 
+        
+    } catch (error) {
+        console.error("Lỗi khi sửa hóa đơn: ", error);
+        AppModal.alert("Có lỗi xảy ra khi đồng bộ Cloud. Vui lòng thử lại!<br>Chi tiết lỗi: " + error.message, "error");
+    }
 }
 function deleteInvoice(id) {
-    AppModal.confirm("Hành động này sẽ XÓA VĨNH VIỄN hóa đơn và HOÀN TRẢ lại số lượng nguyên liệu vào kho. Bạn chắc chắn muốn xóa?", () => {
+    AppModal.confirm("Hành động này sẽ XÓA VĨNH VIỄN hóa đơn và HOÀN TRẢ lại số lượng nguyên liệu vào kho. Bạn chắc chắn muốn xóa?", async () => {
         const invoices = db_invoices;
         const invIndex = invoices.findIndex(i => i.id === id);
         if (invIndex === -1) return;
 
         const invoiceToDelete = invoices[invIndex];
 
-        // 1. Hoàn trả lại tồn kho (Truyền tham số true để isRollback = true)
+        // 1. Tính toán bù trừ kho (Hoàn trả lại số lượng nguyên liệu của các món vào mảng db_goods cục bộ)
         processInvoiceStock(invoiceToDelete.items, true);
 
-        // 2. Xóa hóa đơn khỏi mảng
-        invoices.splice(invIndex, 1);
+        try {
+            // 2. Dùng Batch để Xóa Hóa đơn và Cập nhật Kho cùng lúc
+            const batch = db.batch();
+            
+            // CẬP NHẬT MỚI: Trỏ tới đích danh file hóa đơn cần xóa trong collection pos_invoices
+            const invoiceRef = db.collection("pos_invoices").doc(id);
+            batch.delete(invoiceRef);
 
-        // 3. Cập nhật đồng bộ lên Firebase
-        saveToFirebase('goodsData', db_goods);
-        saveToFirebase('invoicesData', invoices);
+            // Tham chiếu đến file lưu Kho hàng
+            const goodsDocName = typeof getBranchDocName === 'function' ? getBranchDocName('goodsData') : 'goodsData';
+            const goodsRef = db.collection("pos_226").doc(goodsDocName);
+            batch.set(goodsRef, { items: db_goods });
 
-        AppModal.alert("Đã xóa hóa đơn và hoàn trả kho nguyên liệu thành công!", "success");
-        
-        // 4. Render lại giao diện
-        renderGoods(); 
-        renderInvoices();
-        updateReports();
+            // Đẩy lệnh lên Cloud Firebase
+            await batch.commit();
+
+            // 3. Xóa tạm khỏi mảng cục bộ để giao diện cập nhật mượt mà ngay lập tức 
+            // (Dù Firebase Real-time cũng sẽ tự động xử lý việc này sau vài mili-giây)
+            db_invoices.splice(invIndex, 1);
+
+            AppModal.alert("Đã xóa hóa đơn và hoàn trả kho nguyên liệu thành công!", "success");
+            
+            // 4. Vẽ lại giao diện
+            renderGoods(); 
+            renderInvoices();
+            updateReports();
+            
+        } catch (error) {
+            console.error("Lỗi khi xóa hóa đơn: ", error);
+            AppModal.alert("Có lỗi xảy ra khi xóa dữ liệu Cloud. Vui lòng thử lại!<br>Chi tiết lỗi: " + error.message, "error");
+        }
+
     }, "Xóa hóa đơn");
 }
 // =========================================
