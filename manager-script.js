@@ -635,6 +635,8 @@ function submitImportReceipt() {
 
     if (importDetails.length === 0) return AppModal.alert("Vui lòng thêm mặt hàng và nhập số lượng > 0!", "warning");
 
+    let targetImportObj;
+
     if (editingImportId) {
         const oldImpIndex = db_imports.findIndex(i => i.id === editingImportId);
         db_imports[oldImpIndex].details.forEach(oldD => {
@@ -651,10 +653,12 @@ function submitImportReceipt() {
             }
         });
         db_imports[oldImpIndex] = { ...db_imports[oldImpIndex], supplier, note, total: grandTotal, details: importDetails };
+        targetImportObj = db_imports[oldImpIndex];
         AppModal.alert("Đã cập nhật phiếu nhập và CÂN BẰNG LẠI KHO thành công!", "success");
     } else {
         const newImport = { id: "PN" + Date.now().toString().slice(-4), date: getCurrentDate() + " " + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }), supplier, note, total: grandTotal, details: importDetails };
         db_imports.push(newImport);
+        targetImportObj = newImport;
         importDetails.forEach(d => {
             const g = db_goods.find(x => x.id === d.id);
             if (g) {
@@ -665,10 +669,27 @@ function submitImportReceipt() {
         AppModal.alert("Nhập hàng thành công!", "success");
     }
 
-    saveToFirebase('importsData', db_imports);
-    saveToFirebase('goodsData', db_goods);
-    closeManagerModal('create-import-modal');
-    renderGoods(); renderImports();
+    // XỬ LÝ LƯU CLOUD AN TOÀN BẰNG BATCH
+    const batch = db.batch();
+    
+    // 1. Lưu phiếu nhập vào Collection pos_imports
+    const importRef = db.collection("pos_imports").doc(targetImportObj.id);
+    batch.set(importRef, targetImportObj);
+
+    // 2. Cập nhật lại kho hàng
+    const goodsDocName = typeof getBranchDocName === 'function' ? getBranchDocName('goodsData') : 'goodsData';
+    const goodsRef = db.collection("pos_226").doc(goodsDocName);
+    batch.set(goodsRef, { items: db_goods });
+
+    // Đẩy dữ liệu lên mây
+    batch.commit().then(() => {
+        closeManagerModal('create-import-modal');
+        renderGoods(); 
+        renderImports();
+    }).catch(error => {
+        AppModal.alert("Lỗi lưu dữ liệu đám mây: " + error.message, "error");
+        console.error("Batch commit failed: ", error);
+    });
 }
 
 function renderImports() {
@@ -802,6 +823,8 @@ function submitAuditReceipt() {
 
     if (auditDetails.length === 0) return AppModal.alert("Vui lòng thêm mặt hàng và nhập số lượng thực tế!", "warning");
 
+    let targetAuditObj;
+
     if (editingAuditId) {
         const oldAudIndex = db_audits.findIndex(a => a.id === editingAuditId);
         db_audits[oldAudIndex].details.forEach(oldD => {
@@ -814,11 +837,13 @@ function submitAuditReceipt() {
             if (g) { g.stock += newD.diff; g.stock = Math.round(g.stock * 100) / 100; }
         });
         db_audits[oldAudIndex] = { ...db_audits[oldAudIndex], note, details: auditDetails };
+        targetAuditObj = db_audits[oldAudIndex];
         AppModal.alert("Đã cập nhật phiếu kiểm và hoàn tác số liệu kho thành công!", "success");
     } else {
         const currentUser = localStorage.getItem('currentUser') || 'Quản lý viên';
         const newAudit = { id: "PK" + Date.now().toString().slice(-4), date: getCurrentDate() + " " + new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }), checker: currentUser, note: note || "Kiểm kê thông thường", details: auditDetails };
         db_audits.push(newAudit);
+        targetAuditObj = newAudit;
         auditDetails.forEach(d => {
             const g = db_goods.find(x => x.id === d.id);
             if (g) { g.stock = d.actualQty; } 
@@ -826,10 +851,27 @@ function submitAuditReceipt() {
         AppModal.alert("Đã lưu biên bản kiểm kê!", "success");
     }
 
-    saveToFirebase('auditsData', db_audits);
-    saveToFirebase('goodsData', db_goods);
-    closeManagerModal('create-audit-modal');
-    renderGoods(); renderAudits();
+    // XỬ LÝ LƯU CLOUD AN TOÀN BẰNG BATCH
+    const batch = db.batch();
+    
+    // 1. Lưu phiếu kiểm vào Collection pos_audits
+    const auditRef = db.collection("pos_audits").doc(targetAuditObj.id);
+    batch.set(auditRef, targetAuditObj);
+
+    // 2. Cập nhật lại kho hàng
+    const goodsDocName = typeof getBranchDocName === 'function' ? getBranchDocName('goodsData') : 'goodsData';
+    const goodsRef = db.collection("pos_226").doc(goodsDocName);
+    batch.set(goodsRef, { items: db_goods });
+
+    // Đẩy dữ liệu lên mây
+    batch.commit().then(() => {
+        closeManagerModal('create-audit-modal');
+        renderGoods(); 
+        renderAudits();
+    }).catch(error => {
+        AppModal.alert("Lỗi lưu dữ liệu đám mây: " + error.message, "error");
+        console.error("Batch commit failed: ", error);
+    });
 }
 
 function renderAudits() {
@@ -1206,9 +1248,6 @@ function handleManagerReportFilterChange() {
     updateReports();
 }
 
-// =========================================
-// CẬP NHẬT CHỈ SỐ BÁO CÁO (DASHBOARD TỔNG QUAN)
-// =========================================
 // =========================================
 // CẬP NHẬT CHỈ SỐ BÁO CÁO (DASHBOARD TỔNG QUAN)
 // =========================================

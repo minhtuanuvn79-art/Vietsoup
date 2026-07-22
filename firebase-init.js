@@ -50,44 +50,41 @@ window.saveToFirebase = function(docName, dataArray) {
         });
 }
 
-// Hàm LẮNG NGHE Real-time (Đã nâng cấp cách ly và Tách Hóa Đơn lẻ)
-// Hàm LẮNG NGHE Real-time (Đã nâng cấp cách ly và Tách Hóa Đơn lẻ)
 window.listenToFirebase = function(docName, callback) {
     const finalDocName = getBranchDocName(docName);
     
-    // Xử lý riêng cho Hóa Đơn (Tải dữ liệu từ Collection)
-    if (docName === 'invoicesData') {
-        db.collection("pos_invoices").onSnapshot((snapshot) => {
+    // Xử lý riêng cho Hóa Đơn, Phiếu Nhập và Phiếu Kiểm Kho (Tải từ Collection)
+    if (docName === 'invoicesData' || docName === 'importsData' || docName === 'auditsData') {
+        let collectionName = "pos_invoices";
+        if (docName === 'importsData') collectionName = "pos_imports";
+        if (docName === 'auditsData') collectionName = "pos_audits";
+
+        db.collection(collectionName).onSnapshot((snapshot) => {
             let items = [];
             snapshot.forEach((doc) => {
                 items.push(doc.data());
             });
 
-            // --- BỔ SUNG: TỰ ĐỘNG SẮP XẾP LẠI THEO THỜI GIAN (CŨ -> MỚI) ---
+            // Sắp xếp lại theo thời gian (Cũ -> Mới)
             items.sort((a, b) => {
-                // Chuẩn hóa định dạng ngày (Xử lý cả HĐ cũ dùng DD/MM/YYYY và HĐ mới dùng YYYY-MM-DD)
                 let dateA = a.date.includes('/') ? a.date.split('/').reverse().join('-') : a.date;
                 let dateB = b.date.includes('/') ? b.date.split('/').reverse().join('-') : b.date;
-                
                 const timeA = a.time || "00:00";
                 const timeB = b.time || "00:00";
-                
-                // Gộp thành chuỗi chuẩn "YYYY-MM-DD HH:MM" để so sánh thời gian chính xác
                 return (dateA + " " + timeA).localeCompare(dateB + " " + timeB);
             });
-            // ---------------------------------------------------------------
 
             callback(items);
         });
         return; 
     }
 
-    // GIỮ NGUYÊN CODE CŨ: Cho các dữ liệu nhẹ như Thực đơn, Nhóm, Kho...
+    // Phần còn lại giữ nguyên cho Thực đơn, Nhóm, Kho...
     db.collection("pos_226").doc(finalDocName).onSnapshot((doc) => {
         if (doc.exists) {
             callback(doc.data().items);
         } else {
-            callback(null); // Document chưa tồn tại
+            callback(null);
         }
     });
 }
